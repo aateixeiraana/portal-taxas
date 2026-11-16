@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <title>Portal de Taxas de Renda Fixa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -78,7 +79,7 @@ td.xcell { position: relative; }
 .tabs a[aria-current="page"] { color: var(--title); border-bottom-color: var(--accent); }
 .tabs a .n { font-weight: 400; color: var(--gray); font-size: 12px; margin-left: 4px; }
 
-.wrap { max-width: 1440px; margin: 0 auto; padding: 18px 20px 40px; display: grid; grid-template-columns: 270px 1fr; gap: 20px; align-items: start; }
+.wrap { max-width: 1440px; margin: 0 auto; padding: 18px 20px 40px; display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
 
 .filters { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 14px; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
