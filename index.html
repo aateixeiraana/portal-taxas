@@ -65,10 +65,12 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .srcbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .srcbar > span:first-child { color: var(--gray); font-size: 13px; }
 .srcbar .hint { flex-basis: 100%; }
-.arow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.xbtn { border: 1px solid var(--line); background: var(--paper); color: var(--gray); border-radius: 50%; width: 22px; height: 22px; line-height: 18px; padding: 0; cursor: pointer; flex: none; font-size: 15px; opacity: .55; }
-tr:hover .xbtn, .xbtn:focus-visible { opacity: 1; }
-.xbtn:hover { background: var(--bad); border-color: var(--bad); color: #fff; }
+.block.dblock { overflow: visible; margin-right: 40px; }
+.block.dblock .tw { overflow: visible; }
+td.xcell { position: relative; }
+.xbtn { position: absolute; right: -36px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; font-size: 16px; font-weight: 700; line-height: 24px; padding: 0; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.xbtn:hover { background: #7d2222; }
+@media (max-width: 900px) { .block.dblock { margin-right: 0; } .block.dblock .tw { overflow-x: auto; } .xbtn { position: static; transform: none; margin-left: 8px; vertical-align: middle; } }
 .exbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; color: var(--gray); }
 .linkbtn { border: 0; background: none; color: var(--navy); text-decoration: underline; cursor: pointer; font-size: 13px; }
 .tabs { max-width: 1440px; margin: 0 auto; padding: 14px 20px 0; display: flex; gap: 4px; overflow-x: auto; }
@@ -296,6 +298,7 @@ td.strong { font-weight: 700; color: var(--title); }
     return `<div class="exbar"><span>Fora dos destaques e dos PDFs:</span>${[...st.excl].sort().map(e => `<button type="button" class="chip" aria-pressed="true" data-rest="${esc(e)}" title="Voltar ${esc(e)} para os destaques">${esc(e)} ×</button>`).join('')}
       <button type="button" class="linkbtn" data-rest="*">Restaurar todos</button></div>`;
   }
+  const xb = r => `<button type="button" class="xbtn" data-ex="${esc(emBase(r))}" title="Tirar ${esc(emBase(r))} dos destaques" aria-label="Tirar ${esc(emBase(r))} dos destaques">×</button>`;
   function destaques(rows, src = st.src) {
     const eb = rows.filter(r => inSrc(r, src) && !st.excl.has(emBase(r)));
     const ixs = IX.map(x => x[0]).filter(k => eb.some(r => r.i === k));
@@ -310,12 +313,12 @@ td.strong { font-weight: 700; color: var(--title); }
         for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
         top.forEach((r, k) => {
           body += `<tr class="${k === 0 ? 'first top1' : ''}">${k === 0 ? `<td class="pz" rowspan="${top.length}">${BK[b]}</td>` : ''}
-            <td class="rank">${k + 1}</td><td><span class="arow">${name(r)}<button type="button" class="xbtn" data-ex="${esc(emBase(r))}" title="Tirar ${esc(emBase(r))} dos destaques" aria-label="Tirar ${esc(emBase(r))} dos destaques">×</button></span></td>${isEB ? '' : `<td>${esc(r.t)}</td><td>${esc(r.p)}</td>`}<td>${esc(r.rt)}</td><td class="c">${risk(r.rk)}</td>
+            <td class="rank">${k + 1}</td><td>${name(r)}</td>${isEB ? '' : `<td>${esc(r.t)}</td><td>${esc(r.p)}</td>`}<td>${esc(r.rt)}</td><td class="c">${risk(r.rk)}</td>
             <td class="num">${money(r.pu)}</td><td class="num">${money(r.am)}</td><td>${r.v}</td>
-            <td class="num${isEB ? '' : ' strong'}">${esc(rate(r))}</td>${isEB ? `<td class="num strong">${esc(gross(r))}</td>` : ''}</tr>`;
+            ${isEB ? `<td class="num">${esc(rate(r))}</td><td class="num strong xcell">${esc(gross(r))}${xb(r)}</td>` : `<td class="num strong xcell">${esc(rate(r))}${xb(r)}</td>`}</tr>`;
         });
       }
-      return `<section class="block"><div class="block-h"><h2>${IXN[ix]} · ${SRCN[src]}</h2><span>Top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pel${isEB ? 'o Gross Up' + lowx() : 'a ' + label().toLowerCase()}</span></div>
+      return `<section class="block dblock"><div class="block-h"><h2>${IXN[ix]} · ${SRCN[src]}</h2><span>Top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pel${isEB ? 'o Gross Up' + lowx() : 'a ' + label().toLowerCase()}</span></div>
         <div class="tw"><table class="prazo"><thead><tr><th>Prazo</th><th class="c">#</th><th>Ativo</th>${isEB ? '' : '<th>Tipo</th><th>Público</th>'}<th>Rating</th><th class="c">Risco XP</th>
         <th class="num">P.U</th><th class="num">Aplic. mín.</th><th>Vencimento</th><th class="num">${label()}</th>${isEB ? '<th class="num">Gross Up</th>' : ''}</tr></thead>
         <tbody>${body}</tbody></table></div></section>`;
