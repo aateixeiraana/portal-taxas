@@ -65,6 +65,12 @@ button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible
 .srcbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .srcbar > span:first-child { color: var(--gray); font-size: 13px; }
 .srcbar .hint { flex-basis: 100%; }
+.arow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.xbtn { border: 1px solid var(--line); background: var(--paper); color: var(--gray); border-radius: 50%; width: 22px; height: 22px; line-height: 18px; padding: 0; cursor: pointer; flex: none; font-size: 15px; opacity: .55; }
+tr:hover .xbtn, .xbtn:focus-visible { opacity: 1; }
+.xbtn:hover { background: var(--bad); border-color: var(--bad); color: #fff; }
+.exbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; color: var(--gray); }
+.linkbtn { border: 0; background: none; color: var(--navy); text-decoration: underline; cursor: pointer; font-size: 13px; }
 .tabs { max-width: 1440px; margin: 0 auto; padding: 14px 20px 0; display: flex; gap: 4px; overflow-x: auto; }
 .tabs a { text-decoration: none; color: var(--gray); font-family: var(--display); font-weight: 600; padding: 10px 14px; border-bottom: 3px solid transparent; white-space: nowrap; }
 .tabs a[aria-current="page"] { color: var(--title); border-bottom-color: var(--accent); }
@@ -210,7 +216,7 @@ td.strong { font-weight: 700; color: var(--title); }
   const IXN = Object.fromEntries(IX);
   const RC = ['AAA','AA','A','BBB','BB ou menor','Sem rating','Soberano'];
   const st = { excl: new Set(), src: 'EB', mode: 0, view: 'destaques', q: '', ix: new Set(), b: new Set(), t: new Set(), rc: new Set(), x: new Set(), p: new Set(), am: '', rk: '', l: false, n: 5, sort: {} };
-  try { const s = JSON.parse(localStorage.getItem('rf-portal') || '{}'); if (s.mode) st.mode = s.mode; if (s.n) st.n = s.n; } catch (e) {}
+  try { const s = JSON.parse(localStorage.getItem('rf-portal') || '{}'); if (s.mode) st.mode = s.mode; if (s.n) st.n = s.n; if (Array.isArray(s.excl)) s.excl.forEach(e => st.excl.add(e)); } catch (e) {}
 
   const $ = s => document.querySelector(s);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -257,7 +263,7 @@ td.strong { font-weight: 700; color: var(--title); }
   });
   function setMode(m) { st.mode = m; [0, 1, 2].forEach(i => $('#m' + i).setAttribute('aria-pressed', m === i)); save(); render(); }
   [0, 1, 2].forEach(i => $('#m' + i).addEventListener('click', () => setMode(i)));
-  function save() { try { localStorage.setItem('rf-portal', JSON.stringify({ mode: st.mode, n: st.n })); } catch (e) {} }
+  function save() { try { localStorage.setItem('rf-portal', JSON.stringify({ mode: st.mode, n: st.n, excl: [...st.excl] })); } catch (e) {} }
 
   function pass(r) {
     if (st.q && !(r.a.toLowerCase().includes(st.q) || r.e.toLowerCase().includes(st.q))) return false;
@@ -285,8 +291,13 @@ td.strong { font-weight: 700; color: var(--title); }
   const empty = src => `<div class="block"><div class="empty">Nenhuma oferta de ${SRCN[src]} com esses filtros.</div></div>`;
 
   // ---------- Destaques ----------
+  function exclBar() {
+    if (!st.excl.size) return `<p class="hint">Clique no × ao lado de um ativo para tirar o emissor dos destaques. O próximo emissor do ranking entra no lugar.</p>`;
+    return `<div class="exbar"><span>Fora dos destaques e dos PDFs:</span>${[...st.excl].sort().map(e => `<button type="button" class="chip" aria-pressed="true" data-rest="${esc(e)}" title="Voltar ${esc(e)} para os destaques">${esc(e)} ×</button>`).join('')}
+      <button type="button" class="linkbtn" data-rest="*">Restaurar todos</button></div>`;
+  }
   function destaques(rows, src = st.src) {
-    const eb = rows.filter(r => inSrc(r, src));
+    const eb = rows.filter(r => inSrc(r, src) && !st.excl.has(emBase(r)));
     const ixs = IX.map(x => x[0]).filter(k => eb.some(r => r.i === k));
     if (!ixs.length) return empty(src);
     const isEB = src === 'EB';
@@ -299,7 +310,7 @@ td.strong { font-weight: 700; color: var(--title); }
         for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
         top.forEach((r, k) => {
           body += `<tr class="${k === 0 ? 'first top1' : ''}">${k === 0 ? `<td class="pz" rowspan="${top.length}">${BK[b]}</td>` : ''}
-            <td class="rank">${k + 1}</td><td>${name(r)}</td>${isEB ? '' : `<td>${esc(r.t)}</td><td>${esc(r.p)}</td>`}<td>${esc(r.rt)}</td><td class="c">${risk(r.rk)}</td>
+            <td class="rank">${k + 1}</td><td><span class="arow">${name(r)}<button type="button" class="xbtn" data-ex="${esc(emBase(r))}" title="Tirar ${esc(emBase(r))} dos destaques" aria-label="Tirar ${esc(emBase(r))} dos destaques">×</button></span></td>${isEB ? '' : `<td>${esc(r.t)}</td><td>${esc(r.p)}</td>`}<td>${esc(r.rt)}</td><td class="c">${risk(r.rk)}</td>
             <td class="num">${money(r.pu)}</td><td class="num">${money(r.am)}</td><td>${r.v}</td>
             <td class="num${isEB ? '' : ' strong'}">${esc(rate(r))}</td>${isEB ? `<td class="num strong">${esc(gross(r))}</td>` : ''}</tr>`;
         });
@@ -672,7 +683,7 @@ td.strong { font-weight: 700; color: var(--title); }
     m.querySelector('.pm-x').addEventListener('click', close); m.querySelector('#ex-cancel').addEventListener('click', close);
     m.addEventListener('click', e => { if (e.target === m) close(); });
     m.querySelector('#ex-go').addEventListener('click', e => {
-      boxes().forEach(b => b.checked ? st.excl.delete(b.value) : st.excl.add(b.value));
+      boxes().forEach(b => b.checked ? st.excl.delete(b.value) : st.excl.add(b.value)); save(); render();
       close(); gerarPDF(views, e.currentTarget);
     });
     m.querySelector('#ex-q').focus();
@@ -687,7 +698,7 @@ td.strong { font-weight: 700; color: var(--title); }
     $('#n-emissao').textContent = nEB; $('#n-credito').textContent = nCP;
     let html = `<div class="summary"><span><b>${rows.length}</b> ativos com os filtros atuais</span><span>${nEB} de Emissão Bancária · ${nCP} de Crédito Privado e LF</span><span>Exibindo: <b style="font-size:15px">${label()}</b></span></div>`;
     if (st.view === 'destaques' || st.view === 'resumo') html += srcBar();
-    if (st.view === 'destaques') html += destaques(rows);
+    if (st.view === 'destaques') html += exclBar() + destaques(rows);
     else if (st.view === 'emissao') html += table('emissao', rows.filter(r => r.c === 'EB'));
     else if (st.view === 'credito') html += table('credito', rows.filter(r => r.c !== 'EB'));
     else html += resumo(rows);
@@ -696,6 +707,8 @@ td.strong { font-weight: 700; color: var(--title); }
       const v = th.dataset.view, k = th.dataset.k, s = st.sort[v] || { k: 'vd', d: 1 };
       st.sort[v] = { k, d: s.k === k ? -s.d : (k === 'rate' || k === 'gross' ? -1 : 1) }; render();
     }));
+    $('#main').querySelectorAll('[data-ex]').forEach(b => b.addEventListener('click', () => { st.excl.add(b.dataset.ex); save(); render(); }));
+    $('#main').querySelectorAll('[data-rest]').forEach(b => b.addEventListener('click', () => { b.dataset.rest === '*' ? st.excl.clear() : st.excl.delete(b.dataset.rest); save(); render(); }));
     $('#main').querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => { st.src = b.dataset.src; render(); }));
     $('#main').querySelectorAll('[data-more]').forEach(b => b.addEventListener('click', () => { limit[b.dataset.more] = 100000; render(); }));
   }
