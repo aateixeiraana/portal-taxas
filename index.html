@@ -120,7 +120,8 @@ td.strong { font-weight: 700; color: var(--title); }
 .prazo td.pz { font-family: var(--display); font-weight: 700; color: var(--title); background: var(--paper) !important; border-right: 2px solid var(--accent); white-space: nowrap; }
 .prazo tr.first td { border-top: 2px solid var(--navy); }
 .prazo td.rank { color: var(--gray); text-align: center; width: 34px; }
-.prazo tr.top1 td:not(.pz) { background: #FBF6E8 !important; }
+.prazo tbody tr td { background: var(--paper); }
+.prazo tbody tr.zg td:not(.pz) { background: var(--beige); }
 .empty { padding: 26px; text-align: center; color: var(--gray); }
 .matrix td { text-align: right; white-space: nowrap; }
 .matrix td:first-child { text-align: left; white-space: normal; min-width: 200px; }
@@ -312,7 +313,7 @@ td.strong { font-weight: 700; color: var(--title); }
         const top = [], seen = new Set();
         for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
         top.forEach((r, k) => {
-          body += `<tr class="${k === 0 ? 'first top1' : ''}">${k === 0 ? `<td class="pz" rowspan="${top.length}">${BK[b]}</td>` : ''}
+          body += `<tr class="${k === 0 ? 'first ' : ''}${k % 2 === 0 ? 'zg' : ''}">${k === 0 ? `<td class="pz" rowspan="${top.length}">${BK[b]}</td>` : ''}
             <td class="rank">${k + 1}</td><td>${name(r)}</td>${isEB ? '' : `<td>${esc(r.t)}</td><td>${esc(r.p)}</td>`}<td>${esc(r.rt)}</td><td class="c">${risk(r.rk)}</td>
             <td class="num">${money(r.pu)}</td><td class="num">${money(r.am)}</td><td>${r.v}</td>
             ${isEB ? `<td class="num">${esc(rate(r))}</td><td class="num strong xcell">${esc(gross(r))}${xb(r)}</td>` : `<td class="num strong xcell">${esc(rate(r))}${xb(r)}</td>`}</tr>`;
