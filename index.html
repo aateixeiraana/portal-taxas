@@ -144,6 +144,7 @@ td.strong { font-weight: 700; color: var(--title); }
         <button id="m1" aria-pressed="false">Taxa Máxima</button>
       </div>
       <button id="pdf" class="pdfbtn" type="button">PDF desta aba</button>
+      <button id="pdfdest" class="pdfbtn" type="button">PDF Destaques</button>
       <button id="pdfall" class="pdfbtn" type="button">PDF completo</button>
       <span id="pdfmsg" class="pdfmsg" role="status"></span>
     </div>
@@ -367,7 +368,7 @@ td.strong { font-weight: 700; color: var(--title); }
     for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
     return top;
   }
-  const VIEWN = { 'destaques:EB': 'Destaques · Emissão Bancária', 'destaques:CP': 'Destaques · Crédito Privado + LF', emissao: 'Emissão Bancária', credito: 'Crédito Privado e Letras Financeiras', 'resumo:EB': 'Resumo por emissor · Emissão Bancária', 'resumo:CP': 'Resumo por emissor · Crédito Privado + LF' };
+  const VIEWN = { diario: 'Diário de Renda Fixa', 'destaques:EB': 'Destaques · Emissão Bancária', 'destaques:CP': 'Destaques · Crédito Privado + LF', emissao: 'Emissão Bancária', credito: 'Crédito Privado e Letras Financeiras', 'resumo:EB': 'Resumo por emissor · Emissão Bancária', 'resumo:CP': 'Resumo por emissor · Crédito Privado + LF' };
   const curKey = () => ['destaques', 'resumo'].includes(st.view) ? st.view + ':' + st.src : st.view;
   const plain = r => r.a + (r.l ? ' · liq. diária' : '');
   const trib = r => r.x ? 'Isento IR' : '-';
@@ -376,6 +377,28 @@ td.strong { font-weight: 700; color: var(--title); }
     const out = [], order = IX.map(x => x[0]);
     const [view, src] = key.split(':');
     const isEBsrc = src === 'EB';
+    if (view === 'diario') {   // mesmo roteiro do Diário de Renda Fixa: lista de crédito privado + resumo da emissão bancária, por indexador
+      const byVenc = (p, q) => p.vd.localeCompare(q.vd) || p.a.localeCompare(q.a);
+      ['CDI+', 'CDI', 'IPCA', 'PRE'].forEach(ix => {
+        const lst = rows.filter(r => r.i === ix && (r.c === 'CP' || r.c === 'LF' || (ix === 'PRE' && r.c === 'TP'))).sort(byVenc);
+        if (lst.length) out.push({ h: IXN[ix], sub: ix === 'PRE' ? 'Todas as categorias' : 'Crédito Privado e Letra Financeira', title: IXN[ix],
+          head: ['ATIVOS', 'TERMO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase()],
+          widths: [.27, .12, .09, .08, .07, .09, .10, .10, .08], right: [5, 6, 8], center: [4, 7], bold: [],
+          body: lst.map(r => [r.a, termo(r), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r)]) });
+        const eb = rows.filter(r => r.c === 'EB' && r.i === ix);
+        if (eb.length) {
+          const sec = pdfSections(eb, 'resumo:EB')[0];
+          sec.sub = (ix === 'PRE' ? 'Todas as categorias' : 'Emissão Bancária') + ' · emissor x prazo';
+          out.push(sec);
+        }
+      });
+      const tp = rows.filter(r => r.c === 'TP').sort(byVenc);
+      if (tp.length) out.push({ h: 'Títulos Públicos', sub: 'Tesouro Nacional', title: 'Títulos Públicos',
+        head: ['ATIVOS', 'EMISSOR', 'TRIBUTAÇÃO', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase()],
+        widths: [.28, .14, .10, .08, .11, .11, .10, .08], right: [4, 5, 7], center: [3, 6], bold: [],
+        body: tp.map(r => [r.a, 'Tesouro Nacional', trib(r), r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r)]) });
+      return out;
+    }
     if (view === 'destaques') {
       const eb = rows.filter(r => inSrc(r, src));
       order.filter(k => eb.some(r => r.i === k)).forEach(ix => {
@@ -456,7 +479,8 @@ td.strong { font-weight: 700; color: var(--title); }
   async function gerarPDF(views, btn) {
     const msg = $('#pdfmsg');
     if (!window.jspdf || !window.jspdf.jsPDF) { msg.textContent = 'Não foi possível carregar o gerador de PDF. Recarregue a página.'; return; }
-    const full = views.length > 1;
+    const full = views.length > 1 || views[0] === 'diario';
+    const isDiario = views[0] === 'diario';
     document.querySelectorAll('.pdfbtn').forEach(b => b.disabled = true); msg.textContent = 'Gerando...';
     await new Promise(r => setTimeout(r, 30));
     try {
@@ -466,7 +490,7 @@ td.strong { font-weight: 700; color: var(--title); }
       addFonts(doc);
       const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 34, AW = W - 2 * M;
       const NAVY = [35, 49, 72], TITLE = [28, 40, 63], HDR = [59, 77, 102], BEIGE = [236, 231, 220], GRAY = [95, 89, 76], LINE = [220, 211, 192], ACC = [190, 174, 139];
-      const docTitle = full ? 'Diário de Renda Fixa' : VIEWN[views[0]];
+      const docTitle = isDiario ? 'Diário de Renda Fixa' : full ? 'Destaques de Renda Fixa' : VIEWN[views[0]];
       const SUB = `Ofertas de ${D.date}${sufx()}`;
       // capa da primeira página
       doc.setFont('RC', 'bold'); doc.setFontSize(21); doc.setTextColor(...TITLE); doc.text(docTitle, M, 52);
@@ -480,7 +504,7 @@ td.strong { font-weight: 700; color: var(--title); }
         const secs = pdfSections(rows, view);
         if (!secs.length) return;
         any = true;
-        if (full) {
+        if (full && !isDiario) {
           if (vi > 0) { doc.addPage(); y = 50; }
           doc.setFont('RC', 'bold'); doc.setFontSize(17); doc.setTextColor(...TITLE); doc.text(VIEWN[view], M, y + 18); y += 26;
         }
@@ -564,7 +588,7 @@ td.strong { font-weight: 700; color: var(--title); }
           doc.setDrawColor(...LINE); doc.line(M, 40, W - M, 40);
         }
       }
-      const fname = `${full ? 'diario_completo' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito')}_renda_fixa_${D.date.split('/').reverse().join('-')}${['', '_taxa_max', '_taxa_media'][st.mode]}.pdf`;
+      const fname = `${isDiario ? 'diario' : full ? 'destaques' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito')}_renda_fixa_${D.date.split('/').reverse().join('-')}${['', '_taxa_max', '_taxa_media'][st.mode]}.pdf`;
       const blob = doc.output('blob'); window.__lastPdf = blob;
       if (!window.claude || !window.claude.use) {   // site próprio, fora do Claude: download normal do navegador
         const u = URL.createObjectURL(blob), link = document.createElement('a');
@@ -608,9 +632,11 @@ td.strong { font-weight: 700; color: var(--title); }
     } catch (e) { return Promise.resolve(null); }
   }
   // ---------- Escolha de emissores antes de gerar o PDF ----------
-  const FULL = ['emissao', 'credito', 'resumo:EB', 'resumo:CP', 'destaques:EB', 'destaques:CP'];
+  const FULL = ['diario'];
+  const DEST = ['destaques:EB', 'destaques:CP'];
   function scopeRows(views) {
     const rows = R.filter(pass);
+    if (views[0] === 'diario') return rows;
     if (views.length > 1) return rows.filter(r => r.c !== 'TP');
     const [v, src] = views[0].split(':');
     if (v === 'emissao') return rows.filter(r => r.c === 'EB');
@@ -624,7 +650,7 @@ td.strong { font-weight: 700; color: var(--title); }
     const list = [...em.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
     let m = document.getElementById('exclmodal');
     if (!m) { m = document.createElement('div'); m.id = 'exclmodal'; m.className = 'pmodal'; document.body.appendChild(m); }
-    const title = views.length > 1 ? 'PDF completo' : 'PDF de ' + VIEWN[views[0]];
+    const title = views[0] === 'diario' ? 'PDF completo' : views.length > 1 ? 'PDF Destaques' : 'PDF de ' + VIEWN[views[0]];
     m.innerHTML = `<div class="pm-box ex-box" role="dialog" aria-modal="true" aria-labelledby="ex-t">
       <div class="pm-h"><h2 id="ex-t">${esc(title)}</h2><button type="button" class="pm-x" aria-label="Fechar">×</button></div>
       <p>Desmarque os emissores que não devem entrar no arquivo. A tela do portal não muda.</p>
@@ -653,6 +679,7 @@ td.strong { font-weight: 700; color: var(--title); }
   }
   $('#pdf').addEventListener('click', () => abrirEscolha([curKey()]));
   $('#pdfall').addEventListener('click', () => abrirEscolha(FULL));
+  $('#pdfdest').addEventListener('click', () => abrirEscolha(DEST));
 
   function render() {
     const rows = R.filter(pass);
