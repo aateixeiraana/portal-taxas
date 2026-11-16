@@ -149,9 +149,9 @@ td.strong { font-weight: 700; color: var(--title); }
     <div class="mode">
       <span>Mostrar</span>
       <div class="seg" role="group" aria-label="Taxa exibida">
-        <button id="m0" aria-pressed="true">Taxa</button>
-        <button id="m2" aria-pressed="false">Taxa Média</button>
-        <button id="m1" aria-pressed="false">Taxa Máxima</button>
+        <button id="m0" aria-pressed="true">Taxa 1</button>
+        <button id="m2" aria-pressed="false">Taxa 2</button>
+        <button id="m1" aria-pressed="false">Taxa 3</button>
       </div>
       <button id="pdf" class="pdfbtn" type="button">PDF desta aba</button>
       <button id="pdfdest" class="pdfbtn" type="button">PDF Destaques</button>
@@ -233,9 +233,11 @@ td.strong { font-weight: 700; color: var(--title); }
   const gnum = r => { const g = r['m' + st.mode]; return g == null ? rnum(r) : g; };
   const riskCls = k => k == null ? 'r-na' : k <= 5 ? 'r-lo' : k <= 12 ? 'r-mid' : 'r-hi';
   const risk = k => `<span class="risk ${riskCls(k)}">${k == null ? '-' : k}</span>`;
-  const label = () => ['Taxa', 'Taxa Máxima', 'Taxa Média'][st.mode];
-  const sufx = () => st.mode ? ' · ' + label() : '';
-  const lowx = () => st.mode ? ' da ' + label().toLowerCase() : '';
+  // Nível de taxa sem nome para o cliente: Taxa 1 = mínima, Taxa 2 = média, Taxa 3 = máxima
+  const NIVEL = () => [1, 3, 2][st.mode];
+  const label = () => 'Taxa ' + NIVEL();
+  const sufx = () => '';
+  const lowx = () => '';
 
   $('#sub').textContent = `Ofertas de ${D.date} · extraídas do Hub XP às ${D.time} · Emissão Bancária no mercado primário`;
 
@@ -374,7 +376,7 @@ td.strong { font-weight: 700; color: var(--title); }
       });
       const rowsH = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([e, d]) => `<tr><td>${esc(e)}</td><td>${esc(d.rt)}</td><td>${d.x ? 'Isento IR' : '-'}</td>` +
         BK.map((_, i) => { const r = d.b[i]; return r ? `<td>${esc(rate(r))}<small>mín. ${money(r.am)}${r.l ? ' · liq. diária' : ''}</small></td>` : '<td>-</td>'; }).join('') + '</tr>').join('');
-      return `<section class="block"><div class="block-h"><h2>${IXN[ix]} · Resumo</h2><span>${SRCN[src]} · melhor ${label().toLowerCase()} de cada emissor por prazo</span></div>
+      return `<section class="block"><div class="block-h"><h2>${IXN[ix]} · Resumo</h2><span>${SRCN[src]} · melhor taxa de cada emissor por prazo · ${label()}</span></div>
         <div class="tw"><table class="matrix"><thead><tr><th>Emissor</th><th>Rating</th><th>Tributação</th>${BK.map(b => `<th class="num">${b}</th>`).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div></section>`;
     }).join('');
   }
@@ -400,7 +402,7 @@ td.strong { font-weight: 700; color: var(--title); }
       ['CDI+', 'CDI', 'IPCA', 'PRE'].forEach(ix => {
         const lst = rows.filter(r => r.i === ix && (r.c === 'CP' || r.c === 'LF' || (ix === 'PRE' && r.c === 'TP'))).sort(byVenc);
         if (lst.length) out.push({ h: IXN[ix], sub: ix === 'PRE' ? 'Todas as categorias' : 'Crédito Privado e Letra Financeira', title: IXN[ix],
-          head: ['ATIVOS', 'TERMO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase()],
+          head: ['ATIVOS', 'TERMO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA'],
           widths: [.27, .12, .09, .08, .07, .09, .10, .10, .08], right: [5, 6, 8], center: [4, 7], bold: [],
           body: lst.map(r => [r.a, termo(r), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r)]) });
         const eb = rows.filter(r => r.c === 'EB' && r.i === ix);
@@ -412,7 +414,7 @@ td.strong { font-weight: 700; color: var(--title); }
       });
       const tp = rows.filter(r => r.c === 'TP').sort(byVenc);
       if (tp.length) out.push({ h: 'Títulos Públicos', sub: 'Tesouro Nacional', title: 'Títulos Públicos',
-        head: ['ATIVOS', 'EMISSOR', 'TRIBUTAÇÃO', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase()],
+        head: ['ATIVOS', 'EMISSOR', 'TRIBUTAÇÃO', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA'],
         widths: [.28, .14, .10, .08, .11, .11, .10, .08], right: [4, 5, 7], center: [3, 6], bold: [],
         body: tp.map(r => [r.a, 'Tesouro Nacional', trib(r), r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r)]) });
       return out;
@@ -434,10 +436,10 @@ td.strong { font-weight: 700; color: var(--title); }
         const t = `${IXN[ix]} · Top ${st.n} por prazo`;
         out.push(isEBsrc
           ? { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()}`, title: t,
-              head: ['PRAZO', '#', 'ATIVO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase(), 'GROSS UP'],
+              head: ['PRAZO', '#', 'ATIVO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.07, .03, .25, .075, .075, .055, .085, .09, .08, .10, .10], body, groups, right: [6, 7, 9, 10], center: [1, 5, 8], bold: [0, 10] }
           : { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()} (isentos: Gross Up calculado no padrão da XP)`, title: t,
-              head: ['PRAZO', '#', 'ATIVO', 'TIPO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase(), 'GROSS UP'],
+              head: ['PRAZO', '#', 'ATIVO', 'TIPO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.065, .03, .23, .045, .075, .07, .055, .085, .085, .075, .095, .095], body, groups, right: [7, 8, 10, 11], center: [1, 6, 9], bold: [0, 11] });
       });
     } else if (view === 'emissao' || view === 'credito') {
@@ -448,11 +450,11 @@ td.strong { font-weight: 700; color: var(--title); }
         const sub = lst.filter(r => r.i === ix);
         out.push(isEB
           ? { h: IXN[ix], sub: 'Emissão Bancária · mercado primário', title: IXN[ix],
-              head: ['ATIVOS', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase(), 'GROSS UP'],
+              head: ['ATIVOS', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.30, .09, .08, .07, .09, .10, .09, .09, .09], right: [4, 5, 7, 8], center: [3, 6], bold: [8],
               body: sub.map(r => [plain(r), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r), gross(r)]) }
           : { h: IXN[ix], sub: 'Crédito Privado e Letra Financeira', title: IXN[ix],
-              head: ['ATIVOS', 'TERMO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', label().toUpperCase(), 'GROSS UP'],
+              head: ['ATIVOS', 'TERMO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.25, .11, .08, .07, .06, .085, .09, .085, .085, .085], right: [5, 6, 8, 9], center: [4, 7], bold: [9],
               body: sub.map(r => [r.a, termo(r), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r), gross(r)]) });
       });
@@ -505,7 +507,7 @@ td.strong { font-weight: 700; color: var(--title); }
     try {
       const rows = R.filter(r => pass(r) && !st.excl.has(emBase(r)));
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
       addFonts(doc);
       const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 34, AW = W - 2 * M;
       const NAVY = [35, 49, 72], TITLE = [28, 40, 63], HDR = [59, 77, 102], BEIGE = [236, 231, 220], GRAY = [95, 89, 76], LINE = [220, 211, 192], ACC = [190, 174, 139];
@@ -586,7 +588,7 @@ td.strong { font-weight: 700; color: var(--title); }
         'Este material foi elaborado com base nas taxas de Renda Fixa encontradas na plataforma da XP Investimentos CCTVM S/A. ("XP Investimentos"), e o cliente deve considerar como dado real os apresentados no canal oficial da XP Investimentos e/ou conferir os valores acessando sua conta na XP Investimentos.',
         'É recomendada a leitura dos prospectos, regulamentos, editais e demais documentos descritivos dos ativos antes de investir, com especial atenção às partes que detalham o risco do investimento. Os investidores devem buscar orientação profissional com relação aos aspectos tributários, regulatórios e outros que sejam relevantes à sua condição específica.'];
       const Rr = ['Investimentos nos mercados financeiro e de capitais estão sujeitos a riscos de perda superior ao capital investido. A rentabilidade passada não é garantia de rentabilidade futura. Não há garantia de lucro, e as decisões tomadas com base nas informações deste material são de responsabilidade de quem as toma.',
-        'Gross Up conforme exibido pela XP. A taxa média é a média simples entre a taxa mínima e a máxima de cada ativo. Aplicação mínima = P.U × quantidade mínima. Os dados podem ter sido extraídos de fonte externa e podem apresentar distorções; confira sempre os dados no canal oficial da XP Investimentos. Para informações e dúvidas, fale com seu assessor de investimentos.'];
+        'Gross Up conforme exibido pela XP. Aplicação mínima = P.U × quantidade mínima. Os dados podem ter sido extraídos de fonte externa e podem apresentar distorções; confira sempre os dados no canal oficial da XP Investimentos. Para informações e dúvidas, fale com seu assessor de investimentos.'];
       const cw = (AW - 30) / 2;
       const col = (arr, x) => { let yy = 118; doc.setFont('PT', 'normal'); doc.setFontSize(8.6); doc.setTextColor(...NAVY);
         arr.forEach(p => { const l = doc.splitTextToSize(p, cw); doc.text(l, x, yy, { align: 'justify', maxWidth: cw }); yy += l.length * 12.4 + 7; }); return yy; };
@@ -607,7 +609,7 @@ td.strong { font-weight: 700; color: var(--title); }
           doc.setDrawColor(...LINE); doc.line(M, 40, W - M, 40);
         }
       }
-      const fname = `${isDiario ? 'diario' : full ? 'destaques' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito')}_renda_fixa_${D.date.split('/').reverse().join('-')}${['', '_taxa_max', '_taxa_media'][st.mode]}.pdf`;
+      const fname = `${isDiario ? 'diario' : full ? 'destaques' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito')}_renda_fixa_${D.date.split('/').reverse().join('-')}_taxa_${NIVEL()}.pdf`;
       const blob = doc.output('blob'); window.__lastPdf = blob;
       if (!window.claude || !window.claude.use) {   // site próprio, fora do Claude: download normal do navegador
         const u = URL.createObjectURL(blob), link = document.createElement('a');
