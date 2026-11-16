@@ -81,10 +81,13 @@ Anexar PDFs (o input de arquivo que aparece sozinho aceita só imagens; é preci
 Mande o texto como mensagem separada (digite na caixa e clique em enviar), por exemplo:
 
 > Taxas de Renda Fixa · DD/MM/AAAA
+>
 > Seguem os arquivos de hoje, em Taxa 1, 2 e 3:
 > • Diário de Renda Fixa: Crédito Privado, LF e Títulos Públicos, com o resumo da Emissão Bancária por emissor e prazo
-> • Destaques: os 5 melhores emissores por prazo, de 6 meses a 5 anos
+> • Destaques: os 5 melhores emissores por prazo, de 6 meses a 5 anos, em Emissão Bancária e Crédito Privado
+>
 > Portal com filtros: https://aateixeiraana.github.io/portal-taxas/
-> Taxas indicativas da XP, sujeitas a alteração conforme estoque e mercado.
+>
+> Taxas indicativas da XP, sujeitas a alteração conforme estoque e mercado. Antes de envio ao cliente faça uma rápida verificação nas taxas.
 
 Use Shift+Enter para quebrar linha. Se algo falhar duas vezes, pare e entregue os PDFs na conversa com a Ana.
