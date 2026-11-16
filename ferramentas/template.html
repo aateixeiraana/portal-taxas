@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+<title>Portal de Taxas de Renda Fixa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600;700&family=PT+Sans+Narrow:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+/* Layout: cabeçalho da marca, barra de filtros fixa à esquerda (desktop) e área de resultados em abas. Mundo visual único (claro), marinho e areia. */
+:root {
+  --navy: #233148;
+  --title: #1C283F;
+  --hdr: #3B4D66;
+  --beige: #ECE7DC;
+  --sand: #F6F3EC;
+  --gray: #5F594C;
+  --line: #DCD3C0;
+  --accent: #BEAE8B;
+  --paper: #FFFFFF;
+  --good: #2F6B4F;
+  --warn: #9A6A12;
+  --bad: #9B2F2F;
+  --display: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "PT Sans Narrow", "Arial Narrow", Arial, sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--sand); color: var(--navy); font-family: var(--body); font-size: 15px; }
+h1, h2, h3 { font-family: var(--display); color: var(--title); text-wrap: balance; margin: 0; }
+button, select, input { font-family: var(--body); font-size: 14px; color: var(--navy); }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { background: var(--paper); border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 1440px; margin: 0 auto; padding: 18px 20px 0; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; }
+.brand h1 { font-size: 26px; font-weight: 700; line-height: 1.1; }
+.brand p { margin: 4px 0 0; color: var(--gray); font-size: 14px; }
+.mode { display: flex; align-items: center; gap: 10px; padding-bottom: 4px; }
+.mode span { color: var(--gray); font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--navy); border-radius: 999px; overflow: hidden; }
+.seg button { border: 0; background: var(--paper); padding: 7px 16px; cursor: pointer; font-family: var(--display); font-weight: 600; letter-spacing: .02em; }
+.seg button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+.pdfbtn { border: 1px solid var(--accent); background: var(--accent); color: var(--title); border-radius: 999px; padding: 7px 16px; cursor: pointer; font-family: var(--display); font-weight: 700; }
+.pdfbtn[disabled] { opacity: .6; cursor: progress; }
+.pdfmsg { font-size: 12px; color: var(--gray); min-width: 0; }
+#pdfmodal, .pmodal { position: fixed; inset: 0; background: rgba(28,40,63,.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+#pdfmodal[hidden], .pmodal[hidden] { display: none; }
+.ex-box { max-width: 640px; }
+.ex-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.ex-tools input { flex: 1 1 200px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 4px; }
+.ex-list { max-height: 50vh; overflow: auto; border: 1px solid var(--line); border-radius: 4px; }
+.ex-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.ex-item[hidden] { display: none; }
+.ex-item small { color: var(--gray); font-size: 12px; text-align: right; }
+.ex-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ex-btns { display: flex; gap: 8px; }
+.pm-box { background: var(--paper); border-radius: 8px; max-width: 900px; width: 100%; max-height: 92vh; overflow: auto; padding: 18px 20px; display: grid; gap: 10px; }
+.pm-h { display: flex; justify-content: space-between; align-items: center; }
+.pm-x { border: 0; background: none; font-size: 26px; cursor: pointer; color: var(--gray); }
+.pm-view { width: 100%; height: 60vh; border: 1px solid var(--line); }
+.pm-box p { margin: 0; }
+.srcbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.srcbar > span:first-child { color: var(--gray); font-size: 13px; }
+.srcbar .hint { flex-basis: 100%; }
+.block.dblock { overflow: visible; margin-right: 40px; }
+.block.dblock .tw { overflow: visible; }
+td.xcell { position: relative; }
+.xbtn { position: absolute; right: -36px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; font-size: 16px; font-weight: 700; line-height: 24px; padding: 0; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.xbtn:hover { background: #7d2222; }
+@media (max-width: 900px) { .block.dblock { margin-right: 0; } .block.dblock .tw { overflow-x: auto; } .xbtn { position: static; transform: none; margin-left: 8px; vertical-align: middle; } }
+.exbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; color: var(--gray); }
+.linkbtn { border: 0; background: none; color: var(--navy); text-decoration: underline; cursor: pointer; font-size: 13px; }
+.tabs { max-width: 1440px; margin: 0 auto; padding: 14px 20px 0; display: flex; gap: 4px; overflow-x: auto; }
+.tabs a { text-decoration: none; color: var(--gray); font-family: var(--display); font-weight: 600; padding: 10px 14px; border-bottom: 3px solid transparent; white-space: nowrap; }
+.tabs a[aria-current="page"] { color: var(--title); border-bottom-color: var(--accent); }
+.tabs a .n { font-weight: 400; color: var(--gray); font-size: 12px; margin-left: 4px; }
+
+.wrap { max-width: 1440px; margin: 0 auto; padding: 18px 20px 40px; display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+
+.filters { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px; display: grid; gap: 14px; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+@media (max-width: 900px) { .filters { position: static; max-height: none; } }
+.filters h3 { font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+.filters h3 button { border: 0; background: none; color: var(--gray); text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0; }
+.fg { display: grid; gap: 6px; }
+.fg > label, .fg > .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--gray); font-family: var(--display); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 4px 10px; cursor: pointer; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.filters select, .filters input[type="search"] { width: 100%; padding: 7px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); }
+.chk { display: flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+.hint { font-size: 12px; color: var(--gray); }
+
+.panel { display: grid; gap: 18px; min-width: 0; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: baseline; color: var(--gray); font-size: 14px; }
+.summary b { color: var(--title); font-family: var(--display); font-size: 18px; }
+.block { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.block-h { background: var(--navy); color: #fff; padding: 10px 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.block-h h2 { color: #fff; font-size: 17px; }
+.block-h span { font-size: 13px; opacity: .85; }
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th { background: var(--hdr); color: #fff; font-family: var(--display); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; text-align: left; padding: 8px 10px; white-space: nowrap; position: sticky; top: 0; }
+th.s { cursor: pointer; user-select: none; }
+th.s:hover { background: var(--navy); }
+th .ar { opacity: .7; font-size: 10px; margin-left: 3px; }
+td { padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: middle; }
+tbody tr:nth-child(even) td { background: var(--sand); }
+td.num, th.num { text-align: right; white-space: nowrap; }
+td.c, th.c { text-align: center; }
+td.strong { font-weight: 700; color: var(--title); }
+.tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--gray); margin-left: 6px; white-space: nowrap; }
+.tag.isento { border-color: var(--good); color: var(--good); }
+.tag.liq { border-color: var(--hdr); color: var(--hdr); }
+.risk { display: inline-block; min-width: 26px; text-align: center; border-radius: 4px; padding: 1px 6px; font-weight: 700; font-size: 12px; color: #fff; }
+.r-lo { background: var(--good); } .r-mid { background: var(--warn); } .r-hi { background: var(--bad); } .r-na { background: var(--line); color: var(--gray); }
+.prazo td.pz { font-family: var(--display); font-weight: 700; color: var(--title); background: var(--paper) !important; border-right: 2px solid var(--accent); white-space: nowrap; }
+.prazo tr.first td { border-top: 2px solid var(--navy); }
+.prazo td.rank { color: var(--gray); text-align: center; width: 34px; }
+.prazo tbody tr td { background: var(--paper); }
+.prazo tbody tr.zg td:not(.pz) { background: var(--beige); }
+.empty { padding: 26px; text-align: center; color: var(--gray); }
+.matrix td { text-align: right; white-space: nowrap; }
+.matrix td:first-child { text-align: left; white-space: normal; min-width: 200px; }
+.matrix td small { display: block; color: var(--gray); font-size: 11px; }
+.matrix th:nth-child(3), .matrix td:nth-child(3) { border-right: 2px solid var(--accent); }
+.more { padding: 10px 14px; display: flex; justify-content: center; }
+.more button, .btn { border: 1px solid var(--navy); background: var(--paper); border-radius: 4px; padding: 7px 14px; cursor: pointer; font-family: var(--display); font-weight: 600; }
+.foot { max-width: 1440px; margin: 0 auto; padding: 0 20px 40px; color: var(--gray); font-size: 13px; line-height: 1.5; }
+.foot .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-top: 1px solid var(--accent); padding-top: 16px; }
+@media (max-width: 760px) { .foot .cols { grid-template-columns: 1fr; } }
+.foot p { margin: 0 0 8px; max-width: 70ch; }
+.foot .sig { margin-top: 14px; font-family: var(--display); font-weight: 700; color: var(--title); font-size: 16px; }
+.foot .sig span { display: block; font-family: var(--body); font-weight: 400; color: var(--gray); font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) { .chip, .seg button, th.s { transition: background .15s, color .15s; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1>Taxas de Renda Fixa</h1>
+      <p id="sub"></p>
+    </div>
+    <div class="mode">
+      <span>Mostrar</span>
+      <div class="seg" role="group" aria-label="Taxa exibida">
+        <button id="m0" aria-pressed="true">Taxa 1</button>
+        <button id="m2" aria-pressed="false">Taxa 2</button>
+        <button id="m1" aria-pressed="false">Taxa 3</button>
+      </div>
+      <button id="pdf" class="pdfbtn" type="button">PDF desta aba</button>
+      <button id="pdfdest" class="pdfbtn" type="button">PDF Destaques</button>
+      <button id="pdfall" class="pdfbtn" type="button">PDF completo</button>
+      <span id="pdfmsg" class="pdfmsg" role="status"></span>
+    </div>
+  </div>
+  <nav class="tabs" aria-label="Seções">
+    <a href="#destaques" data-v="destaques">Destaques</a>
+    <a href="#emissao" data-v="emissao">Emissão Bancária <span class="n" id="n-emissao"></span></a>
+    <a href="#credito" data-v="credito">Crédito Privado e LF <span class="n" id="n-credito"></span></a>
+    <a href="#titulos" data-v="titulos">Títulos Públicos <span class="n" id="n-titulos"></span></a>
+    <a href="#resumo" data-v="resumo">Resumo por emissor</a>
+  </nav>
+</header>
+
+<div class="wrap">
+  <aside class="filters" aria-label="Filtros">
+    <h3>Filtros <button id="clear" type="button">Limpar</button></h3>
+    <div class="fg"><label for="q">Buscar emissor ou ativo</label><input type="search" id="q" placeholder="Ex.: Pine, BNDES, NTN"></div>
+    <div class="fg"><span class="lbl">Indexador</span><div class="chips" id="f-ix"></div></div>
+    <div class="fg"><span class="lbl">Prazo</span><div class="chips" id="f-b"></div></div>
+    <div class="fg"><span class="lbl">Tipo de ativo</span><div class="chips" id="f-t"></div></div>
+    <div class="fg"><span class="lbl">Rating</span><div class="chips" id="f-rc"></div></div>
+    <div class="fg"><label for="f-am">Aplicação mínima até</label>
+      <select id="f-am">
+        <option value="">Qualquer valor</option><option value="1000">R$ 1.000</option><option value="5000">R$ 5.000</option>
+        <option value="10000">R$ 10.000</option><option value="50000">R$ 50.000</option><option value="100000">R$ 100.000</option>
+        <option value="1000000">R$ 1.000.000</option>
+      </select></div>
+    <div class="fg"><label for="f-rk">Risco XP até</label>
+      <select id="f-rk"><option value="">Qualquer</option><option value="3">3</option><option value="5">5</option><option value="8">8</option><option value="12">12</option><option value="20">20</option></select></div>
+    <div class="fg"><span class="lbl">Tributação</span>
+      <div class="chips" id="f-x"><button class="chip" data-v="1" aria-pressed="false">Isento IR</button><button class="chip" data-v="0" aria-pressed="false">Tributado</button></div></div>
+    <div class="fg"><span class="lbl">Público</span>
+      <div class="chips" id="f-p"><button class="chip" data-v="Geral" aria-pressed="false">Geral</button><button class="chip" data-v="Qualificado" aria-pressed="false">Qualificado</button><button class="chip" data-v="Profissional" aria-pressed="false">Profissional</button></div></div>
+    <label class="chk"><input type="checkbox" id="f-l"> Só liquidez diária</label>
+    <div class="fg"><label for="f-n">Destaques: emissores por prazo</label>
+      <select id="f-n"><option>3</option><option>4</option><option selected>5</option><option>10</option></select></div>
+    <p class="hint">Os filtros valem para todas as abas. Nos destaques, cada emissor aparece uma vez por prazo, com a melhor oferta.</p>
+  </aside>
+
+  <main class="panel" id="main"></main>
+</div>
+
+<footer class="foot">
+  <div class="cols">
+    <div>
+      <p>Este material tem cunho meramente informativo. As informações são indicativas e não constituem indicação, consultoria ou análise de valores mobiliários e/ou instrumentos financeiros.</p>
+      <p>As taxas foram extraídas da plataforma da XP Investimentos CCTVM S/A. e podem mudar a qualquer momento conforme estoque e condições de mercado. Considere como dado real o apresentado no canal oficial da XP Investimentos ou na sua conta.</p>
+    </div>
+    <div>
+      <p>Investimentos nos mercados financeiro e de capitais estão sujeitos a riscos de perda superior ao capital investido. A rentabilidade passada não é garantia de rentabilidade futura. Leia os documentos dos ativos antes de investir.</p>
+      <p>Gross Up conforme exibido pela XP. Aplicação mínima = P.U × quantidade mínima. Para dúvidas, fale com seu assessor de investimentos.</p>
+    </div>
+  </div>
+</footer>
+
+<script id="data" type="application/json">__DATA__</script>
+<script id="pdffonts" type="application/json">__FONTS__</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById('data').textContent);
+  const R = D.recs;
+  const BK = ['6 meses','1 ano','2 anos','3 anos','4 anos','5 anos','6 anos','7 anos','>7 anos'];
+  const IX = [['CDI+','CDI +'],['CDI','% CDI'],['IPCA','IPCA +'],['PRE','Pré-Fixado'],['IGPM','IGP-M'],['SELIC','Selic']];
+  const IXN = Object.fromEntries(IX);
+  const RC = ['AAA','AA','A','BBB','BB ou menor','Sem rating','Soberano'];
+  const st = { excl: new Set(), src: 'EB', mode: 0, view: 'destaques', q: '', ix: new Set(), b: new Set(), t: new Set(), rc: new Set(), x: new Set(), p: new Set(), am: '', rk: '', l: false, n: 5, sort: {} };
+  try { const s = JSON.parse(localStorage.getItem('rf-portal') || '{}'); if (s.mode) st.mode = s.mode; if (s.n) st.n = s.n; if (Array.isArray(s.excl)) s.excl.forEach(e => st.excl.add(e)); } catch (e) {}
+
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const money = v => 'R$ ' + Math.round(v).toLocaleString('pt-BR');
+  const K = ['0','1','2'];  // 0 = taxa (mínima), 1 = máxima, 2 = média
+  const rate = r => r['r' + st.mode];
+  const rnum = r => r['n' + st.mode];
+  const gross = r => r['g' + st.mode] || rate(r);
+  const gnum = r => { const g = r['m' + st.mode]; return g == null ? rnum(r) : g; };
+  const riskCls = k => k == null ? 'r-na' : k <= 5 ? 'r-lo' : k <= 12 ? 'r-mid' : 'r-hi';
+  const risk = k => `<span class="risk ${riskCls(k)}">${k == null ? '-' : k}</span>`;
+  // Nível de taxa sem nome para o cliente: Taxa 1 = mínima, Taxa 2 = média, Taxa 3 = máxima
+  const NIVEL = () => [1, 3, 2][st.mode];
+  const label = () => 'Taxa ' + NIVEL();
+  const sufx = () => '';
+  const lowx = () => '';
+
+  $('#sub').textContent = `Ofertas de ${D.date} · extraídas do Hub XP às ${D.time} · Emissão Bancária no mercado primário`;
+
+  function chips(el, items, set) {
+    el.innerHTML = items.map(([v, t]) => `<button class="chip" type="button" data-v="${esc(v)}" aria-pressed="false">${esc(t)}</button>`).join('');
+    bindChips(el, set);
+  }
+  function bindChips(el, set) {
+    el.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+      const v = b.dataset.v; set.has(v) ? set.delete(v) : set.add(v); b.setAttribute('aria-pressed', set.has(v)); render();
+    }));
+  }
+  const present = k => [...new Set(R.map(r => r[k]))];
+  chips($('#f-ix'), IX.filter(([k]) => present('i').includes(k)), st.ix);
+  chips($('#f-b'), BK.map((t, i) => [String(i), t]), st.b);
+  const tipos = present('t').sort((a, b) => R.filter(r => r.t === b).length - R.filter(r => r.t === a).length);
+  chips($('#f-t'), tipos.map(t => [t, t]), st.t);
+  chips($('#f-rc'), RC.filter(c => present('rc').includes(c)).map(c => [c, c]), st.rc);
+  bindChips($('#f-x'), st.x); bindChips($('#f-p'), st.p);
+  $('#q').addEventListener('input', e => { st.q = e.target.value.trim().toLowerCase(); render(); });
+  $('#f-am').addEventListener('change', e => { st.am = e.target.value; render(); });
+  $('#f-rk').addEventListener('change', e => { st.rk = e.target.value; render(); });
+  $('#f-l').addEventListener('change', e => { st.l = e.target.checked; render(); });
+  $('#f-n').value = String(st.n);
+  $('#f-n').addEventListener('change', e => { st.n = +e.target.value; save(); render(); });
+  $('#clear').addEventListener('click', () => {
+    ['ix','b','t','rc','x','p'].forEach(k => st[k].clear()); st.q = ''; st.am = ''; st.rk = ''; st.l = false;
+    document.querySelectorAll('.filters .chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+    $('#q').value = ''; $('#f-am').value = ''; $('#f-rk').value = ''; $('#f-l').checked = false; render();
+  });
+  function setMode(m) { st.mode = m; [0, 1, 2].forEach(i => $('#m' + i).setAttribute('aria-pressed', m === i)); save(); render(); }
+  [0, 1, 2].forEach(i => $('#m' + i).addEventListener('click', () => setMode(i)));
+  function save() { try { localStorage.setItem('rf-portal', JSON.stringify({ mode: st.mode, n: st.n, excl: [...st.excl] })); } catch (e) {} }
+
+  function pass(r) {
+    if (st.q && !(r.a.toLowerCase().includes(st.q) || r.e.toLowerCase().includes(st.q))) return false;
+    if (st.ix.size && !st.ix.has(r.i)) return false;
+    if (st.b.size && !st.b.has(String(r.b))) return false;
+    if (st.t.size && !st.t.has(r.t)) return false;
+    if (st.rc.size && !st.rc.has(r.rc)) return false;
+    if (st.x.size && !st.x.has(String(r.x))) return false;
+    if (st.p.size && !st.p.has(r.p)) return false;
+    if (st.am && r.am > +st.am) return false;
+    if (st.rk && (r.rk == null || r.rk > +st.rk)) return false;
+    if (st.l && !r.l) return false;
+    return true;
+  }
+  const name = r => `${esc(r.a)}${r.x ? '<span class="tag isento">Isento IR</span>' : ''}${r.l ? '<span class="tag liq">Liquidez diária</span>' : ''}`;
+
+  const TIPOS_PREF = /^(CDB|LCA|LCI|LCD|LF|LFS|LFSN|LFSC|LIG|DEB|CRI|CRA|CPRF|CPR-F|CDCA|CCB|NTN-B|NTN-F|NTN-C|LTN|LFT)\s+/i;
+  const emBase = r => r.e.replace(TIPOS_PREF, '').trim();
+  const SRCN = { EB: 'Emissão Bancária', CP: 'Crédito Privado + LF' };
+  const inSrc = (r, src) => src === 'EB' ? r.c === 'EB' : (r.c === 'CP' || r.c === 'LF');
+  const srcBar = () => `<div class="srcbar"><span>Fonte</span><div class="seg" role="group" aria-label="Fonte dos ativos">
+      <button type="button" data-src="EB" aria-pressed="${st.src === 'EB'}">Emissão Bancária</button>
+      <button type="button" data-src="CP" aria-pressed="${st.src === 'CP'}">Crédito Privado + LF</button></div>
+      ${st.src === 'CP' ? '<span class="hint">CRI, CRA, debêntures, LF e demais, ordenados pelo Gross Up.' + (R.some(r => r.gc) ? ' Nos isentos de crédito privado o Gross Up é calculado no padrão da XP (diferença de até 0,1 p.p. em relação à tela da XP).' : '') + '</span>' : ''}</div>`;
+  const empty = src => `<div class="block"><div class="empty">Nenhuma oferta de ${SRCN[src]} com esses filtros.</div></div>`;
+
+  // ---------- Destaques ----------
+  function exclBar() {
+    if (!st.excl.size) return `<p class="hint">Clique no × ao lado de um ativo para tirar o emissor dos destaques. O próximo emissor do ranking entra no lugar.</p>`;
+    return `<div class="exbar"><span>Fora dos destaques e dos PDFs:</span>${[...st.excl].sort().map(e => `<button type="button" class="chip" aria-pressed="true" data-rest="${esc(e)}" title="Voltar ${esc(e)} para os destaques">${esc(e)} ×</button>`).join('')}
+      <button type="button" class="linkbtn" data-rest="*">Restaurar todos</button></div>`;
+  }
+  const xb = r => `<button type="button" class="xbtn" data-ex="${esc(emBase(r))}" title="Tirar ${esc(emBase(r))} dos destaques" aria-label="Tirar ${esc(emBase(r))} dos destaques">×</button>`;
+  function destaques(rows, src = st.src) {
+    const eb = rows.filter(r => inSrc(r, src) && !st.excl.has(emBase(r)));
+    const ixs = IX.map(x => x[0]).filter(k => eb.some(r => r.i === k));
+    if (!ixs.length) return empty(src);
+    const isEB = src === 'EB';
+    return ixs.map(ix => {
+      const sub = eb.filter(r => r.i === ix);
+      let body = '';
+      for (let b = 0; b <= 5; b++) {   // destaques: de 6 meses até 5 anos
+        const pool = sub.filter(r => r.b === b).sort((p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd));
+        const top = [], seen = new Set();
+        for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
+        top.forEach((r, k) => {
+          body += `<tr class="${k === 0 ? 'first ' : ''}${k % 2 === 0 ? 'zg' : ''}">${k === 0 ? `<td class="pz" rowspan="${top.length}">${BK[b]}</td>` : ''}
+            <td class="rank">${k + 1}</td><td>${name(r)}</td>${isEB ? '' : `<td>${esc(r.t)}</td><td>${esc(r.p)}</td>`}<td>${esc(r.rt)}</td><td class="c">${risk(r.rk)}</td>
+            <td class="num">${money(r.pu)}</td><td class="num">${money(r.am)}</td><td>${r.v}</td>
+            <td class="num">${esc(rate(r))}</td><td class="num strong xcell">${esc(gross(r))}${xb(r)}</td></tr>`;
+        });
+      }
+      return `<section class="block dblock"><div class="block-h"><h2>${IXN[ix]} · ${SRCN[src]}</h2><span>Top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()}</span></div>
+        <div class="tw"><table class="prazo"><thead><tr><th>Prazo</th><th class="c">#</th><th>Ativo</th>${isEB ? '' : '<th>Tipo</th><th>Público</th>'}<th>Rating</th><th class="c">Risco XP</th>
+        <th class="num">P.U</th><th class="num">Aplic. mín.</th><th>Vencimento</th><th class="num">${label()}</th><th class="num">Gross Up</th></tr></thead>
+        <tbody>${body}</tbody></table></div></section>`;
+    }).join('');
+  }
+
+  // ---------- Tabelas ----------
+  const COLS = {
+    emissao: [['a','Ativo'],['rt','Rating'],['rk','Risco XP','c'],['pu','P.U','num'],['am','Aplic. mín.','num'],['vd','Vencimento'],['rate','TAXA','num'],['gross','Gross Up','num']],
+    credito: [['a','Ativo'],['t','Tipo'],['p','Público'],['rt','Rating'],['rk','Risco XP','c'],['pu','P.U','num'],['am','Aplic. mín.','num'],['vd','Vencimento'],['rate','TAXA','num'],['gross','Gross Up','num']],
+    titulos: [['a','Ativo'],['rk','Risco XP','c'],['pu','P.U','num'],['am','Aplic. mín.','num'],['vd','Vencimento'],['rate','TAXA','num']]
+  };
+  const sortVal = (r, k) => k === 'rate' ? (rnum(r) ?? -1e9) : k === 'gross' ? (gnum(r) ?? -1e9) : k === 'rk' ? (r.rk ?? 999) : r[k];
+  const limit = { emissao: 200, credito: 200, titulos: 200 };
+  function table(view, rows) {
+    const cols = COLS[view];
+    const s = st.sort[view] || { k: 'vd', d: 1 };
+    rows = rows.slice().sort((p, q) => {
+      const a = sortVal(p, s.k), b = sortVal(q, s.k);
+      return (a < b ? -1 : a > b ? 1 : 0) * s.d || p.vd.localeCompare(q.vd);
+    });
+    const groups = IX.map(x => x[0]).filter(k => rows.some(r => r.i === k) && !(s.k !== 'vd' && false));
+    if (!rows.length) return `<div class="block"><div class="empty">Nenhum ativo com esses filtros.</div></div>`;
+    return groups.map(ix => {
+      const sub = rows.filter(r => r.i === ix);
+      const shown = sub.slice(0, limit[view + ix] || limit[view]);
+      const head = cols.map(([k, t, cl]) => `<th class="s ${cl || ''}" data-k="${k}" data-view="${view}">${k === 'rate' ? label() : t}${s.k === k ? `<span class="ar">${s.d > 0 ? '▲' : '▼'}</span>` : ''}</th>`).join('');
+      const body = shown.map(r => '<tr>' + cols.map(([k, t, cl]) => {
+        const v = k === 'a' ? name(r) : k === 'rk' ? risk(r.rk) : k === 'pu' || k === 'am' ? money(r[k]) : k === 'vd' ? r.v : k === 'rate' ? esc(rate(r)) : k === 'gross' ? esc(gross(r)) : esc(r[k]);
+        return `<td class="${cl || ''}${k === 'gross' || (k === 'rate' && view === 'titulos') ? ' strong' : ''}">${v}</td>`;
+      }).join('') + '</tr>').join('');
+      const more = sub.length > shown.length ? `<div class="more"><button type="button" data-more="${view + ix}">Mostrar todos os ${sub.length}</button></div>` : '';
+      return `<section class="block"><div class="block-h"><h2>${IXN[ix]}</h2><span>${sub.length} ${sub.length === 1 ? 'ativo' : 'ativos'}</span></div>
+        <div class="tw"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>${more}</section>`;
+    }).join('');
+  }
+
+  // ---------- Resumo emissor x prazo ----------
+  function resumo(rows, src = st.src) {
+    const eb = rows.filter(r => inSrc(r, src));
+    const ixs = IX.map(x => x[0]).filter(k => eb.some(r => r.i === k));
+    if (!ixs.length) return empty(src);
+    return ixs.map(ix => {
+      const m = new Map();
+      eb.filter(r => r.i === ix).forEach(r => {
+        const e = m.get(r.e) || { rt: r.rt, x: r.x, b: {} };
+        const cur = e.b[r.b];
+        if (!cur || rnum(r) > rnum(cur) || (rnum(r) === rnum(cur) && r.am < cur.am)) e.b[r.b] = r;
+        m.set(r.e, e);
+      });
+      const rowsH = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([e, d]) => `<tr><td>${esc(e)}</td><td>${esc(d.rt)}</td><td>${d.x ? 'Isento IR' : '-'}</td>` +
+        BK.map((_, i) => { const r = d.b[i]; return r ? `<td>${esc(rate(r))}<small>mín. ${money(r.am)}${r.l ? ' · liq. diária' : ''}</small></td>` : '<td>-</td>'; }).join('') + '</tr>').join('');
+      return `<section class="block"><div class="block-h"><h2>${IXN[ix]} · Resumo</h2><span>${SRCN[src]} · melhor taxa de cada emissor por prazo · ${label()}</span></div>
+        <div class="tw"><table class="matrix"><thead><tr><th>Emissor</th><th>Rating</th><th>Tributação</th>${BK.map(b => `<th class="num">${b}</th>`).join('')}</tr></thead><tbody>${rowsH}</tbody></table></div></section>`;
+    }).join('');
+  }
+
+  // ---------- PDF (mesmo visual do Diário de Renda Fixa) ----------
+  function rankDest(sub, b) {
+    const pool = sub.filter(r => r.b === b).sort((p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd));
+    const top = [], seen = new Set();
+    for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
+    return top;
+  }
+  const VIEWN = { diario: 'Diário de Renda Fixa', titulos: 'Títulos Públicos', 'destaques:EB': 'Destaques · Emissão Bancária', 'destaques:CP': 'Destaques · Crédito Privado + LF', emissao: 'Emissão Bancária', credito: 'Crédito Privado e Letras Financeiras', 'resumo:EB': 'Resumo por emissor · Emissão Bancária', 'resumo:CP': 'Resumo por emissor · Crédito Privado + LF' };
+  const curKey = () => ['destaques', 'resumo'].includes(st.view) ? st.view + ':' + st.src : st.view;
+  const plain = r => r.a + (r.l ? ' · liq. diária' : '');
+  const trib = r => r.x ? 'Isento IR' : '-';
+  const termo = r => r.p === 'Geral' ? '-' : 'Investidor ' + r.p;
+  function pdfSections(rows, key) {
+    const out = [], order = IX.map(x => x[0]);
+    const [view, src] = key.split(':');
+    const isEBsrc = src === 'EB';
+    if (view === 'diario') {   // mesmo roteiro do Diário de Renda Fixa: lista de crédito privado + resumo da emissão bancária, por indexador
+      const byVenc = (p, q) => p.vd.localeCompare(q.vd) || p.a.localeCompare(q.a);
+      ['CDI+', 'CDI', 'IPCA', 'PRE'].forEach(ix => {
+        const lst = rows.filter(r => r.i === ix && (r.c === 'CP' || r.c === 'LF' || (ix === 'PRE' && r.c === 'TP'))).sort(byVenc);
+        if (lst.length) out.push({ h: IXN[ix], sub: ix === 'PRE' ? 'Todas as categorias' : 'Crédito Privado e Letra Financeira', title: IXN[ix],
+          head: ['ATIVOS', 'TERMO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA'],
+          widths: [.27, .12, .09, .08, .07, .09, .10, .10, .08], right: [5, 6, 8], center: [4, 7], bold: [],
+          body: lst.map(r => [r.a, termo(r), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r)]) });
+        const eb = rows.filter(r => r.c === 'EB' && r.i === ix);
+        if (eb.length) {
+          const sec = pdfSections(eb, 'resumo:EB')[0];
+          sec.sub = (ix === 'PRE' ? 'Todas as categorias' : 'Emissão Bancária') + ' · emissor x prazo';
+          out.push(sec);
+        }
+      });
+      const tp = rows.filter(r => r.c === 'TP').sort(byVenc);
+      if (tp.length) out.push({ h: 'Títulos Públicos', sub: 'Tesouro Nacional', title: 'Títulos Públicos',
+        head: ['ATIVOS', 'EMISSOR', 'TRIBUTAÇÃO', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA'],
+        widths: [.28, .14, .10, .08, .11, .11, .10, .08], right: [4, 5, 7], center: [3, 6], bold: [],
+        body: tp.map(r => [r.a, 'Tesouro Nacional', trib(r), r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r)]) });
+      return out;
+    }
+    if (view === 'titulos') return pdfSections(rows.filter(r => r.c === 'TP'), 'diario').filter(x => x.h === 'Títulos Públicos');
+    if (view === 'destaques') {
+      const eb = rows.filter(r => inSrc(r, src));
+      order.filter(k => eb.some(r => r.i === k)).forEach(ix => {
+        const sub = eb.filter(r => r.i === ix), body = [], groups = [];
+        let g = 0;
+        for (let b = 0; b <= 5; b++) {
+          const top = rankDest(sub, b);
+          if (!top.length) continue;
+          top.forEach((r, k) => { groups.push(g); body.push([...(k === 0 ? [{ content: BK[b].toUpperCase(), rowSpan: top.length, styles: { valign: 'middle' } }] : []),
+            String(k + 1), plain(r), ...(isEBsrc ? [] : [r.t]), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r), gross(r)]); });
+          g++;
+        }
+        if (!body.length) return;
+        const t = `${IXN[ix]} · Top ${st.n} por prazo`;
+        out.push(isEBsrc
+          ? { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()}`, title: t,
+              head: ['PRAZO', '#', 'ATIVO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
+              widths: [.07, .03, .25, .075, .075, .055, .085, .09, .08, .10, .10], body, groups, right: [6, 7, 9, 10], center: [1, 5, 8], bold: [0, 10] }
+          : { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${R.some(r => r.gc) ? ' (isentos: Gross Up calculado no padrão da XP)' : ''}`, title: t,
+              head: ['PRAZO', '#', 'ATIVO', 'TIPO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
+              widths: [.065, .03, .23, .045, .075, .07, .055, .085, .085, .075, .095, .095], body, groups, right: [7, 8, 10, 11], center: [1, 6, 9], bold: [0, 11] });
+      });
+    } else if (view === 'emissao' || view === 'credito') {
+      const isEB = view === 'emissao';
+      const s = st.sort[view] || { k: 'vd', d: 1 };
+      const lst = rows.filter(r => isEB ? r.c === 'EB' : (r.c === 'CP' || r.c === 'LF')).sort((p, q) => { const a = sortVal(p, s.k), b = sortVal(q, s.k); return (a < b ? -1 : a > b ? 1 : 0) * s.d || p.vd.localeCompare(q.vd); });
+      order.filter(k => lst.some(r => r.i === k)).forEach(ix => {
+        const sub = lst.filter(r => r.i === ix);
+        out.push(isEB
+          ? { h: IXN[ix], sub: 'Emissão Bancária · mercado primário', title: IXN[ix],
+              head: ['ATIVOS', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
+              widths: [.30, .09, .08, .07, .09, .10, .09, .09, .09], right: [4, 5, 7, 8], center: [3, 6], bold: [8],
+              body: sub.map(r => [plain(r), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r), gross(r)]) }
+          : { h: IXN[ix], sub: 'Crédito Privado e Letra Financeira', title: IXN[ix],
+              head: ['ATIVOS', 'TERMO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
+              widths: [.25, .11, .08, .07, .06, .085, .09, .085, .085, .085], right: [5, 6, 8, 9], center: [4, 7], bold: [9],
+              body: sub.map(r => [r.a, termo(r), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r), gross(r)]) });
+      });
+    } else {
+      const eb = rows.filter(r => inSrc(r, src));
+      order.filter(k => eb.some(r => r.i === k)).forEach(ix => {
+        const m = new Map();
+        eb.filter(r => r.i === ix).forEach(r => {
+          const e = m.get(r.e) || { rt: r.rt, x: r.x, b: {} }; const cur = e.b[r.b];
+          if (!cur || rnum(r) > rnum(cur) || (rnum(r) === rnum(cur) && r.am < cur.am)) e.b[r.b] = r; m.set(r.e, e);
+        });
+        const body = [...m.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([e, d]) => [e, d.rt, d.x ? 'Isento IR' : '-',
+          ...BK.map((_, i) => { const r = d.b[i]; return r ? { content: rate(r), sub: `mín. ${money(r.am)}${r.l ? ' · liq. diária' : ''}` } : '-'; })]);
+        out.push({ h: `${IXN[ix]} RESUMO`, sub: `${SRCN[src]} · emissor x prazo`, title: `${IXN[ix]} RESUMO`,
+          head: ['EMISSOR', 'RATING', 'TRIBUTAÇÃO', ...BK.map(b => b.toUpperCase())], widths: [.20, .06, .065, ...BK.map(() => .675 / 9)],
+          body, right: [3, 4, 5, 6, 7, 8, 9, 10, 11], center: [], bold: [], vline: 2 });
+      });
+    }
+    return out;
+  }
+  function filtrosTexto() {
+    const p = [];
+    if (st.q) p.push(`busca "${st.q}"`);
+    if (st.ix.size) p.push('indexador ' + [...st.ix].map(k => IXN[k]).join(', '));
+    if (st.b.size) p.push('prazo ' + [...st.b].map(k => BK[+k]).join(', '));
+    if (st.t.size) p.push('tipo ' + [...st.t].join(', '));
+    if (st.rc.size) p.push('rating ' + [...st.rc].join(', '));
+    if (st.am) p.push('aplicação mínima até ' + money(+st.am));
+    if (st.rk) p.push('risco XP até ' + st.rk);
+    if (st.x.size) p.push([...st.x].map(v => v === '1' ? 'isento IR' : 'tributado').join(', '));
+    if (st.p.size) p.push('público ' + [...st.p].join(', '));
+    if (st.l) p.push('só liquidez diária');
+    if (st.excl.size) p.push('emissores excluídos: ' + [...st.excl].sort().join(', '));
+    return p.length ? 'Filtros: ' + p.join(' · ') : '';
+  }
+  let fontsReady = false;
+  function addFonts(doc) {
+    const F = JSON.parse(document.getElementById('pdffonts').textContent);
+    [['RC-B.ttf', 'RC', 'bold'], ['PT.ttf', 'PT', 'normal'], ['PT-B.ttf', 'PT', 'bold']].forEach(([f, n, w]) => {
+      doc.addFileToVFS(f, F[f]); doc.addFont(f, n, w);
+    });
+  }
+  async function gerarPDF(views, btn) {
+    const msg = $('#pdfmsg');
+    if (!window.jspdf || !window.jspdf.jsPDF) { msg.textContent = 'Não foi possível carregar o gerador de PDF. Recarregue a página.'; return; }
+    const full = views.length > 1 || views[0] === 'diario';
+    const isDiario = views[0] === 'diario';
+    document.querySelectorAll('.pdfbtn').forEach(b => b.disabled = true); msg.textContent = 'Gerando...';
+    await new Promise(r => setTimeout(r, 30));
+    try {
+      const rows = R.filter(r => pass(r) && !st.excl.has(emBase(r)));
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
+      addFonts(doc);
+      const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 34, AW = W - 2 * M;
+      const NAVY = [35, 49, 72], TITLE = [28, 40, 63], HDR = [59, 77, 102], BEIGE = [236, 231, 220], GRAY = [95, 89, 76], LINE = [220, 211, 192], ACC = [190, 174, 139];
+      const docTitle = isDiario ? 'Diário de Renda Fixa' : full ? 'Destaques de Renda Fixa' : VIEWN[views[0]];
+      const SUB = `Ofertas de ${D.date}${sufx()}`;
+      // capa da primeira página
+      doc.setFont('RC', 'bold'); doc.setFontSize(21); doc.setTextColor(...TITLE); doc.text(docTitle, M, 52);
+      doc.setFont('PT', 'normal'); doc.setFontSize(10.5); doc.setTextColor(...GRAY); doc.text(SUB, M, 68);
+      let y = 80;
+      const ft = filtrosTexto();
+      if (ft) { doc.setFontSize(8.5); const l = doc.splitTextToSize(ft, AW); doc.text(l, M, y); y += l.length * 10; }
+      doc.setDrawColor(...ACC); doc.setLineWidth(0.6); doc.line(M, y, W - M, y); y += 8;
+      let any = false;
+      views.forEach((view, vi) => {
+        const secs = pdfSections(rows, view);
+        if (!secs.length) return;
+        any = true;
+        if (full && !isDiario) {
+          if (vi > 0) { doc.addPage(); y = 50; }
+          doc.setFont('RC', 'bold'); doc.setFontSize(17); doc.setTextColor(...TITLE); doc.text(VIEWN[view], M, y + 18); y += 26;
+        }
+        secs.forEach(sec => {
+          if (y > H - 170) { doc.addPage(); y = 50; }
+          y += 12;
+          doc.setFont('RC', 'bold'); doc.setFontSize(13.5); doc.setTextColor(...TITLE); doc.text(sec.h, M, y + 10);
+          doc.setFont('PT', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text(sec.sub, M, y + 21);
+          y += 28;
+          const colStyles = {}; sec.widths.forEach((w, i) => colStyles[i] = { cellWidth: w * AW });
+          const isResumo = sec.vline != null;
+          doc.autoTable({
+            startY: y, margin: { left: M, right: M, top: 50, bottom: 44 }, theme: 'plain', tableWidth: AW,
+            head: [[{ content: sec.title, colSpan: sec.head.length, styles: { fillColor: NAVY, textColor: 255, font: 'PT', fontStyle: 'bold', fontSize: 7, cellPadding: { top: 6, bottom: 6, left: 5, right: 5 } } }], sec.head],
+            body: sec.body,
+            columnStyles: colStyles,
+            styles: { font: 'PT', overflow: 'linebreak' },
+            headStyles: { fillColor: HDR, textColor: 255, font: 'PT', fontStyle: 'bold', fontSize: 6.8, cellPadding: { top: 4.2, bottom: 4.2, left: 5, right: 5 }, valign: 'middle' },
+            bodyStyles: { font: 'PT', fontSize: 7.2, textColor: NAVY, cellPadding: { top: isResumo ? 3 : 4.2, bottom: isResumo ? 3 : 4.2, left: 5, right: 5 }, valign: 'middle' },
+            didParseCell: d => {
+              const c = d.column.index;
+              if (d.section === 'head' && d.row.index === 1) { if (sec.right.includes(c)) d.cell.styles.halign = 'right'; if (sec.center.includes(c)) d.cell.styles.halign = 'center'; }
+              if (d.section !== 'body') return;
+              if (sec.right.includes(c)) d.cell.styles.halign = 'right';
+              if (sec.center.includes(c)) d.cell.styles.halign = 'center';
+              if (sec.bold.includes(c)) d.cell.styles.fontStyle = 'bold';
+              const zebra = sec.groups ? sec.groups[d.row.index] % 2 === 1 : d.row.index % 2 === 1;
+              d.cell.styles.fillColor = zebra ? BEIGE : [255, 255, 255];
+              if (d.cell.raw && typeof d.cell.raw === 'object' && d.cell.raw.sub) { d.cell.text = [d.cell.raw.content, ' ']; }
+            },
+            willDrawCell: d => {
+              if (d.section === 'head' && d.row.index === 0 && d.pageNumber > 1) d.cell.text = [sec.title + ' (continuação)'];
+            },
+            didDrawCell: d => {
+              const c = d.column.index;
+              if (d.section === 'body' && d.cell.raw && typeof d.cell.raw === 'object' && d.cell.raw.sub) {
+                doc.setFont('PT', 'normal'); doc.setFontSize(5.6); doc.setTextColor(...GRAY);
+                doc.text(d.cell.raw.sub, d.cell.x + d.cell.width - 5, d.cell.y + d.cell.height - 4, { align: 'right' });
+              }
+              if (isResumo && c === sec.vline && d.section !== 'head' || (isResumo && c === sec.vline && d.section === 'head' && d.row.index === 1)) {
+                doc.setDrawColor(...ACC); doc.setLineWidth(0.8); doc.line(d.cell.x + d.cell.width, d.cell.y, d.cell.x + d.cell.width, d.cell.y + d.cell.height);
+              }
+              if (sec.groups && d.section === 'body' && d.row.index > 0 && sec.groups[d.row.index] !== sec.groups[d.row.index - 1] && d.row.raw.length === sec.head.length) {
+                doc.setDrawColor(...LINE); doc.setLineWidth(0.6); doc.line(d.cell.x, d.cell.y, d.cell.x + d.cell.width, d.cell.y);
+              }
+            },
+            didDrawPage: () => {},
+            showHead: 'everyPage', rowPageBreak: 'avoid'
+          });
+          const fy = doc.lastAutoTable.finalY;
+          doc.setDrawColor(...LINE); doc.setLineWidth(0.6); doc.line(M, fy, W - M, fy);
+          y = fy + 6;
+        });
+      });
+      if (!any) { msg.textContent = 'Nada para exportar com esses filtros.'; return; }
+      // página final de avisos, em duas colunas
+      doc.addPage();
+      doc.setDrawColor(...ACC); doc.setLineWidth(0.6); doc.line(M, 100, W - M, 100);
+      const L = ['Este material tem cunho meramente informativo. O conteúdo não foi elaborado com o propósito de venda, publicidade ou oferta de produto ou serviço. As informações contidas neste documento são meramente indicativas e informativas, e não constituem ou devem ser interpretadas como indicação, consultoria ou análise de valores mobiliários e/ou instrumentos financeiros.',
+        'Este material foi elaborado com base nas taxas de Renda Fixa encontradas na plataforma da XP Investimentos CCTVM S/A. ("XP Investimentos"), e o cliente deve considerar como dado real os apresentados no canal oficial da XP Investimentos e/ou conferir os valores acessando sua conta na XP Investimentos.',
+        'É recomendada a leitura dos prospectos, regulamentos, editais e demais documentos descritivos dos ativos antes de investir, com especial atenção às partes que detalham o risco do investimento. Os investidores devem buscar orientação profissional com relação aos aspectos tributários, regulatórios e outros que sejam relevantes à sua condição específica.'];
+      const Rr = ['Investimentos nos mercados financeiro e de capitais estão sujeitos a riscos de perda superior ao capital investido. A rentabilidade passada não é garantia de rentabilidade futura. Não há garantia de lucro, e as decisões tomadas com base nas informações deste material são de responsabilidade de quem as toma.',
+        'Gross Up conforme exibido pela XP. Aplicação mínima = P.U × quantidade mínima. Os dados podem ter sido extraídos de fonte externa e podem apresentar distorções; confira sempre os dados no canal oficial da XP Investimentos. Para informações e dúvidas, fale com seu assessor de investimentos.'];
+      const cw = (AW - 30) / 2;
+      const col = (arr, x) => { let yy = 118; doc.setFont('PT', 'normal'); doc.setFontSize(8.6); doc.setTextColor(...NAVY);
+        arr.forEach(p => { const l = doc.splitTextToSize(p, cw); doc.text(l, x, yy, { align: 'justify', maxWidth: cw }); yy += l.length * 12.4 + 7; }); return yy; };
+      const y1 = col(L, M), y2 = col(Rr, M + cw + 30);
+      doc.setDrawColor(...ACC); doc.line(M, Math.max(y1, y2) + 4, W - M, Math.max(y1, y2) + 4);
+      // cabeçalho corrido e rodapé
+      const n = doc.getNumberOfPages();
+      for (let i = 1; i <= n; i++) {
+        doc.setPage(i);
+        doc.setDrawColor(...LINE); doc.setLineWidth(0.6); doc.line(M, H - 30, W - M, H - 30);
+        doc.setFont('PT', 'normal'); doc.setFontSize(7); doc.setTextColor(...GRAY);
+        doc.text(`Material informativo · ${SUB}`, M, H - 20);
+        doc.text(`Página ${i} de ${n}`, W - M, H - 20, { align: 'right' });
+        if (i > 1) {
+          doc.setFont('RC', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...TITLE); doc.text(docTitle, M, 30);
+          const x = M + doc.getTextWidth(docTitle);
+          doc.setFont('PT', 'normal'); doc.setTextColor(...GRAY); doc.text(` · ${SUB}`, x, 30);
+          doc.setDrawColor(...LINE); doc.line(M, 40, W - M, 40);
+        }
+      }
+      const fname = `${isDiario ? 'diario' : full ? 'destaques' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito')}_renda_fixa_${D.date.split('/').reverse().join('-')}_taxa_${NIVEL()}.pdf`;
+      const blob = doc.output('blob'); window.__lastPdf = blob;
+      if (!window.claude || !window.claude.use) {   // site próprio, fora do Claude: download normal do navegador
+        const u = URL.createObjectURL(blob), link = document.createElement('a');
+        link.href = u; link.download = fname; document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 60000);
+        msg.textContent = 'PDF baixado.'; return;
+      }
+      const dl = await getDl();
+      if (dl) {
+        try { await dl.save({ filename: fname, data: blob }); msg.textContent = 'PDF salvo.'; return; }
+        catch (e) {
+          const c = e && e.code; window.__dlErr = c || String(e);
+          if (c === 'declined') { msg.textContent = 'Download cancelado.'; return; }
+          if (c === 'rate_limited') { msg.textContent = 'Já há um download aguardando confirmação.'; return; }
+        }
+      }
+      abrirFallback(blob, fname, dl ? (window.__dlErr || 'erro') : 'sem acesso ao download');
+      msg.textContent = '';
+    } catch (e) {
+      console.error(e); msg.textContent = 'Não foi possível gerar o PDF agora.';
+    } finally { document.querySelectorAll('.pdfbtn').forEach(b => b.disabled = false); }
+  }
+  function abrirFallback(blob, fname, why) {
+    const url = URL.createObjectURL(blob);
+    let m = document.getElementById('pdfmodal');
+    if (!m) { m = document.createElement('div'); m.id = 'pdfmodal'; document.body.appendChild(m); }
+    m.innerHTML = `<div class="pm-box" role="dialog" aria-modal="true" aria-labelledby="pm-t">
+      <div class="pm-h"><h2 id="pm-t">Seu PDF está pronto</h2><button type="button" class="pm-x" aria-label="Fechar">×</button></div>
+      <p>O download direto não foi liberado nesta visualização (${esc(why)}). Use a opção abaixo:</p>
+      <p><a class="btn" href="${url}" target="_blank" rel="noopener">Abrir o PDF em nova aba</a></p>
+      <p class="hint">Na nova aba, use o botão de download ou imprimir do próprio leitor de PDF. Se nada abrir, entre com uma conta Claude e abra o link do portal de novo, que o botão salva o arquivo direto.</p>
+    </div>`;
+    m.hidden = false;
+    m.querySelector('.pm-x').addEventListener('click', () => { m.hidden = true; });
+    m.addEventListener('click', e => { if (e.target === m) m.hidden = true; });
+  }
+  function getDl() {   // resolvido no clique: o runtime pode chegar depois do primeiro carregamento
+    try {
+      if (!window.claude || !window.claude.use) return Promise.resolve(null);
+      return Promise.race([window.claude.use('downloads'), new Promise(r => setTimeout(() => r(null), 10000))]).catch(() => null);
+    } catch (e) { return Promise.resolve(null); }
+  }
+  // ---------- Escolha de emissores antes de gerar o PDF ----------
+  const FULL = ['diario'];
+  const DEST = ['destaques:EB', 'destaques:CP'];
+  function scopeRows(views) {
+    const rows = R.filter(pass);
+    if (views[0] === 'diario') return rows;
+    if (views.length > 1) return rows.filter(r => r.c !== 'TP');
+    const [v, src] = views[0].split(':');
+    if (v === 'emissao') return rows.filter(r => r.c === 'EB');
+    if (v === 'credito') return rows.filter(r => r.c === 'CP' || r.c === 'LF');
+    if (v === 'titulos') return rows.filter(r => r.c === 'TP');
+    return rows.filter(r => inSrc(r, src));
+  }
+  function abrirEscolha(views) {
+    const rows = scopeRows(views);
+    const em = new Map();
+    rows.forEach(r => { const k = emBase(r); const e = em.get(k) || { n: 0, t: new Set() }; e.n++; e.t.add(r.t); em.set(k, e); });
+    const list = [...em.entries()].sort((a, b) => a[0].localeCompare(b[0], 'pt-BR'));
+    let m = document.getElementById('exclmodal');
+    if (!m) { m = document.createElement('div'); m.id = 'exclmodal'; m.className = 'pmodal'; document.body.appendChild(m); }
+    const title = views[0] === 'diario' ? 'PDF completo' : views.length > 1 ? 'PDF Destaques' : 'PDF de ' + VIEWN[views[0]];
+    m.innerHTML = `<div class="pm-box ex-box" role="dialog" aria-modal="true" aria-labelledby="ex-t">
+      <div class="pm-h"><h2 id="ex-t">${esc(title)}</h2><button type="button" class="pm-x" aria-label="Fechar">×</button></div>
+      <p>Desmarque os emissores que não devem entrar no arquivo. A tela do portal não muda.</p>
+      <div class="ex-tools"><input type="search" id="ex-q" placeholder="Buscar emissor" aria-label="Buscar emissor">
+        <button type="button" class="btn" id="ex-all">Marcar todos</button><button type="button" class="btn" id="ex-none">Desmarcar todos</button></div>
+      <div class="ex-list" id="ex-list">${list.map(([k, e]) => `<label class="ex-item" data-k="${esc(k.toLowerCase())}"><input type="checkbox" value="${esc(k)}" ${st.excl.has(k) ? '' : 'checked'}>
+        <span>${esc(k)}</span><small>${[...e.t].join(', ')} · ${e.n} ${e.n === 1 ? 'ativo' : 'ativos'}</small></label>`).join('')}</div>
+      <div class="ex-foot"><span id="ex-count" class="hint"></span><span class="ex-btns"><button type="button" class="btn" id="ex-cancel">Cancelar</button><button type="button" class="pdfbtn" id="ex-go">Gerar PDF</button></span></div>
+    </div>`;
+    m.hidden = false;
+    const boxes = () => [...m.querySelectorAll('.ex-item input')];
+    const count = () => { const off = boxes().filter(b => !b.checked).length; m.querySelector('#ex-count').textContent = off ? `${off} ${off === 1 ? 'emissor excluído' : 'emissores excluídos'} de ${list.length}` : `Todos os ${list.length} emissores incluídos`; };
+    count();
+    m.querySelector('#ex-list').addEventListener('change', count);
+    m.querySelector('#ex-q').addEventListener('input', e => { const q = e.target.value.trim().toLowerCase(); m.querySelectorAll('.ex-item').forEach(l => l.hidden = q && !l.dataset.k.includes(q)); });
+    m.querySelector('#ex-all').addEventListener('click', () => { boxes().filter(b => !b.closest('.ex-item').hidden).forEach(b => b.checked = true); count(); });
+    m.querySelector('#ex-none').addEventListener('click', () => { boxes().filter(b => !b.closest('.ex-item').hidden).forEach(b => b.checked = false); count(); });
+    const close = () => { m.hidden = true; };
+    m.querySelector('.pm-x').addEventListener('click', close); m.querySelector('#ex-cancel').addEventListener('click', close);
+    m.addEventListener('click', e => { if (e.target === m) close(); });
+    m.querySelector('#ex-go').addEventListener('click', e => {
+      boxes().forEach(b => b.checked ? st.excl.delete(b.value) : st.excl.add(b.value)); save(); render();
+      close(); gerarPDF(views, e.currentTarget);
+    });
+    m.querySelector('#ex-q').focus();
+  }
+  $('#pdf').addEventListener('click', () => abrirEscolha([curKey()]));
+  $('#pdfall').addEventListener('click', () => abrirEscolha(FULL));
+  $('#pdfdest').addEventListener('click', () => abrirEscolha(DEST));
+
+  function render() {
+    const rows = R.filter(pass);
+    const nEB = rows.filter(r => r.c === 'EB').length, nCP = rows.filter(r => r.c === 'CP' || r.c === 'LF').length, nTP = rows.filter(r => r.c === 'TP').length;
+    $('#n-emissao').textContent = nEB; $('#n-credito').textContent = nCP; $('#n-titulos').textContent = nTP;
+    let html = `<div class="summary"><span><b>${rows.length}</b> ativos com os filtros atuais</span><span>${nEB} de Emissão Bancária · ${nCP} de Crédito Privado e LF · ${nTP} de Títulos Públicos</span><span>Exibindo: <b style="font-size:15px">${label()}</b></span></div>`;
+    if (st.view === 'destaques' || st.view === 'resumo') html += srcBar();
+    if (st.view === 'destaques') html += exclBar() + destaques(rows);
+    else if (st.view === 'emissao') html += table('emissao', rows.filter(r => r.c === 'EB'));
+    else if (st.view === 'credito') html += table('credito', rows.filter(r => r.c === 'CP' || r.c === 'LF'));
+    else if (st.view === 'titulos') html += table('titulos', rows.filter(r => r.c === 'TP'));
+    else html += resumo(rows);
+    $('#main').innerHTML = html;
+    $('#main').querySelectorAll('th.s').forEach(th => th.addEventListener('click', () => {
+      const v = th.dataset.view, k = th.dataset.k, s = st.sort[v] || { k: 'vd', d: 1 };
+      st.sort[v] = { k, d: s.k === k ? -s.d : (k === 'rate' || k === 'gross' ? -1 : 1) }; render();
+    }));
+    $('#main').querySelectorAll('[data-ex]').forEach(b => b.addEventListener('click', () => { st.excl.add(b.dataset.ex); save(); render(); }));
+    $('#main').querySelectorAll('[data-rest]').forEach(b => b.addEventListener('click', () => { b.dataset.rest === '*' ? st.excl.clear() : st.excl.delete(b.dataset.rest); save(); render(); }));
+    $('#main').querySelectorAll('[data-src]').forEach(b => b.addEventListener('click', () => { st.src = b.dataset.src; render(); }));
+    $('#main').querySelectorAll('[data-more]').forEach(b => b.addEventListener('click', () => { limit[b.dataset.more] = 100000; render(); }));
+  }
+  function route() {
+    const h = location.hash.replace('#', '');
+    st.view = ['destaques','emissao','credito','titulos','resumo'].includes(h) ? h : 'destaques';
+    document.querySelectorAll('.tabs a').forEach(a => a.setAttribute('aria-current', a.dataset.v === st.view ? 'page' : 'false'));
+    render();
+  }
+  window.addEventListener('hashchange', route);
+  setMode(st.mode); route();
+})();
+</script>
+</body>
+</html>

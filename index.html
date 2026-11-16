@@ -294,7 +294,7 @@ td.strong { font-weight: 700; color: var(--title); }
   const srcBar = () => `<div class="srcbar"><span>Fonte</span><div class="seg" role="group" aria-label="Fonte dos ativos">
       <button type="button" data-src="EB" aria-pressed="${st.src === 'EB'}">Emissão Bancária</button>
       <button type="button" data-src="CP" aria-pressed="${st.src === 'CP'}">Crédito Privado + LF</button></div>
-      ${st.src === 'CP' ? '<span class="hint">CRI, CRA, debêntures, LF e demais, ordenados pelo Gross Up. Nos isentos de crédito privado o Gross Up é calculado no padrão da XP (diferença de até 0,1 p.p. em relação à tela da XP).</span>' : ''}</div>`;
+      ${st.src === 'CP' ? '<span class="hint">CRI, CRA, debêntures, LF e demais, ordenados pelo Gross Up.' + (R.some(r => r.gc) ? ' Nos isentos de crédito privado o Gross Up é calculado no padrão da XP (diferença de até 0,1 p.p. em relação à tela da XP).' : '') + '</span>' : ''}</div>`;
   const empty = src => `<div class="block"><div class="empty">Nenhuma oferta de ${SRCN[src]} com esses filtros.</div></div>`;
 
   // ---------- Destaques ----------
@@ -438,7 +438,7 @@ td.strong { font-weight: 700; color: var(--title); }
           ? { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()}`, title: t,
               head: ['PRAZO', '#', 'ATIVO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.07, .03, .25, .075, .075, .055, .085, .09, .08, .10, .10], body, groups, right: [6, 7, 9, 10], center: [1, 5, 8], bold: [0, 10] }
-          : { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()} (isentos: Gross Up calculado no padrão da XP)`, title: t,
+          : { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${R.some(r => r.gc) ? ' (isentos: Gross Up calculado no padrão da XP)' : ''}`, title: t,
               head: ['PRAZO', '#', 'ATIVO', 'TIPO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.065, .03, .23, .045, .075, .07, .055, .085, .085, .075, .095, .095], body, groups, right: [7, 8, 10, 11], center: [1, 6, 9], bold: [0, 11] });
       });
