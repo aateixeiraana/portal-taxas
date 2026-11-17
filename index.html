@@ -122,19 +122,20 @@ td.strong { font-weight: 700; color: var(--title); }
 .prazo tr.first td { border-top: 2px solid var(--navy); }
 .prazo td.rank { color: var(--gray); text-align: center; width: 34px; }
 .prazo tbody tr td { background: var(--paper); }
-.rc-card { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px 14px 10px; max-width: 1180px; }
+.rc-card { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px 14px 10px; width: max-content; max-width: 100%; overflow-x: auto; }
 .rc-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 10px; }
 .rc-head b { font-family: var(--display); font-size: 18px; color: var(--title); }
 .rc-head span { color: var(--gray); font-size: 13px; }
-.rc-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; align-items: start; }
+.rc-grid { display: grid; grid-template-columns: auto auto; gap: 10px; align-items: start; }
 @media (max-width: 1100px) { .rc-grid { grid-template-columns: 1fr; } }
-table.rc { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px; }
-table.rc th, table.rc td { padding: 2px 6px; border-bottom: 1px solid #fff; white-space: nowrap; }
+table.rc { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 11px; }
+table.rc th, table.rc td { padding: 2px 4px; border-bottom: 1px solid #fff; white-space: nowrap; }
 table.rc .rc-t th { background: var(--navy); color: #fff; text-align: center; font-size: 12px; letter-spacing: .06em; padding: 4px; }
-table.rc thead tr:nth-child(2) th { background: var(--beige); color: var(--title); font-size: 11px; text-transform: uppercase; position: static; }
+table.rc thead tr:nth-child(2) th { background: var(--beige); color: var(--title); font-size: 10px; text-transform: uppercase; position: static; }
 table.rc tbody tr:nth-child(odd) td { background: #F1F2F4; }
 table.rc tbody tr:nth-child(even) td { background: #E6E8EC; }
 table.rc td.c, table.rc th.c { text-align: center; }
+table.rc td.rc-em { max-width: 125px; overflow: hidden; text-overflow: ellipsis; }
 table.rc td.rc-x { background: transparent !important; border: 0; padding: 0 0 0 4px; width: 18px; }
 .xmini { width: 16px; height: 16px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; font-size: 11px; line-height: 16px; padding: 0; cursor: pointer; opacity: .35; }
 table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
@@ -367,14 +368,14 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     const { cp, tp, eb, cef } = selResumo(rows);
     const dot = r => `<span class="dot ${r.x ? 'sim' : 'nao'}" title="${r.x ? 'Isento de IR' : 'Tributado'}"></span>`;
     const tipoDe = r => r._tipo || r.t;
-    const linha = (r, dur) => `<tr><td>${esc(tipoDe(r))}</td><td>${esc(r.c === 'TP' ? 'TESOURO NACIONAL' : emBase(r).toUpperCase())}</td><td class="c">${mmyy(r)}</td>${dur ? `<td class="c">${r.du != null ? r.du.toFixed(2).replace('.', ',') : '-'}</td>` : ''}<td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${esc(r.c === 'TP' ? 'Soberano' : r.rt)}</td><td class="c">${money(r.am)}</td>${xr(r)}</tr>`;
-    const tab = (titulo, lst, dur) => lst.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="${dur ? 8 : 7}">${titulo}</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th>${dur ? '<th class="c">DURATION</th>' : ''}<th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">RATING</th><th class="c">APLIC. MÍN.</th></tr></thead><tbody>${lst.map(r => linha(r, dur)).join('')}</tbody></table>` : '';
-    const linhaCef = r => `<tr><td>${esc(r.t)}</td><td>${/BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA'}</td><td class="c">${mmyy(r)}</td><td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${money(r.pu)}</td><td class="c">${money(r.am)}</td>${xr(r)}</tr>`;
-    const tabCef = cef.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="7">ATIVOS DA CEF E BNDES</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th><th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">P.U.</th><th class="c">APLIC. MÍN.</th></tr></thead><tbody>${cef.map(linhaCef).join('')}</tbody></table>` : '';
+    const linha = (r, dur) => `<tr><td>${esc(tipoDe(r))}</td><td class="rc-em" title="${esc(r.c === 'TP' ? 'TESOURO NACIONAL' : emBase(r).toUpperCase())}">${esc(r.c === 'TP' ? 'TESOURO NACIONAL' : emBase(r).toUpperCase())}</td><td class="c">${mmyy(r)}</td>${dur ? `<td class="c">${r.du != null ? r.du.toFixed(2).replace('.', ',') : '-'}</td>` : ''}<td class="c">${esc(rate(r))}</td>${r.c === 'TP' ? '' : `<td class="c">${esc(gross(r))}</td>`}<td class="c">${dot(r)}</td><td class="c">${esc(r.c === 'TP' ? 'Soberano' : r.rt)}</td><td class="c">${money(r.am)}</td>${xr(r)}</tr>`;
+    const tab = (titulo, lst, dur, gu = true) => lst.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="${(dur ? 9 : 8) - (gu ? 0 : 1)}">${titulo}</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENC.</th>${dur ? '<th class="c" title="Duration em anos">DUR.</th>' : ''}<th class="c">TAXA</th>${gu ? '<th class="c">GROSS UP</th>' : ''}<th class="c">ISENTO</th><th class="c">RATING</th><th class="c">APLIC. MÍN.</th></tr></thead><tbody>${lst.map(r => linha(r, dur)).join('')}</tbody></table>` : '';
+    const linhaCef = r => `<tr><td>${esc(r.t)}</td><td>${/BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA'}</td><td class="c">${mmyy(r)}</td><td class="c">${esc(rate(r))}</td><td class="c">${esc(gross(r))}</td><td class="c">${dot(r)}</td><td class="c">${money(r.am)}</td>${xr(r)}</tr>`;
+    const tabCef = cef.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="7">ATIVOS DA CEF E BNDES</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENC.</th><th class="c">TAXA</th><th class="c">GROSS UP</th><th class="c">ISENTO</th><th class="c">APLIC. MÍN.</th></tr></thead><tbody>${cef.map(linhaCef).join('')}</tbody></table>` : '';
     if (!cp.length && !tp.length && !eb.length && !cef.length) return empty('CP');
     return `<p class="hint">Resumo pronto para print: a melhor oferta de cada emissor por tipo e indexador no crédito privado (público geral, rating AA ou AAA), vencimentos ao longo da curva nos títulos públicos o melhor emissor de cada prazo de 1 a 5 anos na emissão bancária (rating A ou melhor) e todas as ofertas da CEF e do BNDES, em ordem de prazo. Escolhendo um rating nos filtros, vale o filtro. ${RESUMO_FORA.length} emissores da sua lista ficam fora só desta tela. Os filtros e o × valem aqui também.</p>
       <div class="rc-card"><div class="rc-head"><b>Taxas de Renda Fixa</b><span>Ofertas de ${D.date} · ${label()}</span></div>
-      <div class="rc-grid"><div>${tab('CRÉDITO PRIVADO', cp, true)}</div><div>${tab('TÍTULO PÚBLICO', tp, false)}${tab('ATIVO BANCÁRIO', eb, false)}${tabCef}</div></div>
+      <div class="rc-grid"><div>${tab('CRÉDITO PRIVADO', cp, true)}</div><div>${tab('TÍTULO PÚBLICO', tp, false, false)}${tab('ATIVO BANCÁRIO', eb, false)}${tabCef}</div></div>
       <div class="rc-foot">Taxas indicativas, sujeitas a alteração conforme estoque e condições de mercado. <span class="dot sim"></span> isento de IR · <span class="dot nao"></span> tributado</div></div>`;
   }
   const xr = r => `<td class="rc-x"><button type="button" class="xmini" data-ex="${esc(emBase(r))}" title="Tirar ${esc(emBase(r))} do resumo" aria-label="Tirar ${esc(emBase(r))} do resumo">×</button></td>`;
@@ -506,17 +507,17 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
       const { cp, tp, eb, cef } = selResumo(rows);
       const isen = r => r.x ? 'Sim' : 'Não';
       if (cp.length) out.push({ h: 'Crédito Privado', sub: 'Melhor oferta de cada emissor por tipo e indexador · público geral', title: 'CRÉDITO PRIVADO',
-        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'DURATION', 'TAXA', 'ISENTO', 'RATING', 'APLIC. MÍN.'], widths: [.07, .25, .11, .09, .16, .08, .11, .13], right: [7], center: [2, 3, 4, 5, 6], bold: [4],
-        body: cp.map(r => [r.t, emBase(r), mmyy(r), r.du != null ? r.du.toFixed(2).replace('.', ',') : '-', rate(r), isen(r), r.rt, money(r.am)]) });
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'DURATION', 'TAXA', 'GROSS UP', 'ISENTO', 'RATING', 'APLIC. MÍN.'], widths: [.06, .22, .10, .08, .14, .14, .07, .09, .10], right: [8], center: [2, 3, 4, 5, 6, 7], bold: [4],
+        body: cp.map(r => [r.t, emBase(r), mmyy(r), r.du != null ? r.du.toFixed(2).replace('.', ',') : '-', rate(r), gross(r), isen(r), r.rt, money(r.am)]) });
       if (tp.length) out.push({ h: 'Título Público', sub: 'Vencimentos ao longo da curva', title: 'TÍTULO PÚBLICO',
         head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'RATING', 'APLIC. MÍN.'], widths: [.12, .24, .12, .16, .09, .13, .14], right: [6], center: [2, 3, 4, 5], bold: [3],
         body: tp.map(r => [r._tipo, 'TESOURO NACIONAL', mmyy(r), rate(r), isen(r), 'Soberano', money(r.am)]) });
       if (eb.length) out.push({ h: 'Ativo Bancário', sub: 'Melhor emissor de cada prazo de 1 a 5 anos, por indexador', title: 'ATIVO BANCÁRIO',
-        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'RATING', 'APLIC. MÍN.'], widths: [.09, .27, .12, .16, .09, .13, .14], right: [6], center: [2, 3, 4, 5], bold: [3],
-        body: eb.map(r => [r.t, emBase(r), mmyy(r), rate(r), isen(r), r.rt, money(r.am)]) });
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'GROSS UP', 'ISENTO', 'RATING', 'APLIC. MÍN.'], widths: [.08, .23, .11, .14, .14, .08, .11, .11], right: [7], center: [2, 3, 4, 5, 6], bold: [3],
+        body: eb.map(r => [r.t, emBase(r), mmyy(r), rate(r), gross(r), isen(r), r.rt, money(r.am)]) });
       if (cef.length) out.push({ h: 'Ativos da CEF e BNDES', sub: 'Todas as ofertas do primário, por prazo', title: 'ATIVOS DA CEF E BNDES',
-        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'P.U.', 'APLIC. MÍN.'], widths: [.08, .24, .13, .15, .08, .16, .16], right: [5, 6], center: [2, 3, 4], bold: [3],
-        body: cef.map(r => [r.t, /BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA', mmyy(r), rate(r), isen(r), money(r.pu), money(r.am)]) });
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'GROSS UP', 'ISENTO', 'APLIC. MÍN.'], widths: [.08, .23, .12, .15, .16, .08, .18], right: [6], center: [2, 3, 4, 5], bold: [3],
+        body: cef.map(r => [r.t, /BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA', mmyy(r), rate(r), gross(r), isen(r), money(r.am)]) });
       return out;
     }
     if (view === 'destaques') {
