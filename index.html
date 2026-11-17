@@ -371,8 +371,8 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     const tipoDe = r => r._tipo || r.t;
     const linha = (r, dur) => `<tr><td>${esc(tipoDe(r))}</td><td>${esc(r.c === 'TP' ? 'TESOURO NACIONAL' : emBase(r))}</td><td class="c">${mmyy(r)}</td>${dur ? `<td class="c">${r.du != null ? String(r.du).replace('.', ',') : '-'}</td>` : ''}<td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${esc(r.c === 'TP' ? 'Soberano' : r.rt)}</td>${xr(r)}</tr>`;
     const tab = (titulo, lst, dur) => lst.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="${dur ? 7 : 6}">${titulo}</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th>${dur ? '<th class="c">DURATION</th>' : ''}<th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">RATING</th></tr></thead><tbody>${lst.map(r => linha(r, dur)).join('')}</tbody></table>` : '';
-    const linhaCef = r => `<tr><td>${esc(r.t)}</td><td>${/BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA'}</td><td class="c">${mmyy(r)}</td><td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${money(r.pu)}</td>${xr(r)}</tr>`;
-    const tabCef = cef.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="6">ATIVOS DA CEF E BNDES</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th><th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">P.U.</th></tr></thead><tbody>${cef.map(linhaCef).join('')}</tbody></table>` : '';
+    const linhaCef = r => `<tr><td>${esc(r.t)}</td><td>${/BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA'}</td><td class="c">${mmyy(r)}</td><td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${money(r.pu)}</td><td class="c">${money(r.am)}</td>${xr(r)}</tr>`;
+    const tabCef = cef.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="7">ATIVOS DA CEF E BNDES</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th><th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">P.U.</th><th class="c">APLIC. MÍN.</th></tr></thead><tbody>${cef.map(linhaCef).join('')}</tbody></table>` : '';
     if (!cp.length && !tp.length && !eb.length && !cef.length) return empty('CP');
     return `<p class="hint">Resumo pronto para print: a melhor oferta de cada emissor por tipo e indexador no crédito privado (público geral, rating AA ou AAA), vencimentos ao longo da curva nos títulos públicos o melhor emissor de cada prazo de 1 a 5 anos na emissão bancária (rating A ou melhor) e todas as ofertas da CEF e do BNDES, em ordem de prazo. Escolhendo um rating nos filtros, vale o filtro. ${RESUMO_FORA.length} emissores da sua lista ficam fora só desta tela. Os filtros e o × valem aqui também.</p>
       <div class="rc-card"><div class="rc-head"><b>Taxas de Renda Fixa</b><span>Ofertas de ${D.date} · ${label()}</span></div>
@@ -517,8 +517,8 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
         head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'RATING'], widths: [.10, .32, .14, .18, .10, .16], right: [], center: [2, 3, 4, 5], bold: [3],
         body: eb.map(r => [r.t, emBase(r), mmyy(r), rate(r), isen(r), r.rt]) });
       if (cef.length) out.push({ h: 'Ativos da CEF e BNDES', sub: 'Todas as ofertas do primário, por prazo', title: 'ATIVOS DA CEF E BNDES',
-        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'P.U.'], widths: [.10, .30, .14, .18, .10, .18], right: [5], center: [2, 3, 4], bold: [3],
-        body: cef.map(r => [r.t, /BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA', mmyy(r), rate(r), isen(r), money(r.pu)]) });
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'P.U.', 'APLIC. MÍN.'], widths: [.08, .24, .13, .15, .08, .16, .16], right: [5, 6], center: [2, 3, 4], bold: [3],
+        body: cef.map(r => [r.t, /BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA', mmyy(r), rate(r), isen(r), money(r.pu), money(r.am)]) });
       return out;
     }
     if (view === 'destaques') {
