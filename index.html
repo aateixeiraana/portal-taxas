@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;600;700&family=PT+Sans+Narrow:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 /* Layout: cabeçalho da marca, barra de filtros fixa à esquerda (desktop) e área de resultados em abas. Mundo visual único (claro), marinho e areia. */
 :root {
@@ -607,7 +608,22 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     try {
       const rows = R.filter(r => pass(r) && !st.excl.has(emBase(r)));
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
+      let doc, resumoImg = false;
+      if (views[0] === 'destaques:RES' && window.html2canvas && document.querySelector('.rc-card')) {
+        // Resumo para o cliente: o PDF é a própria tela do card
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        const card = document.querySelector('.rc-card');
+        const cv = await html2canvas(card, { scale: 2.5, backgroundColor: '#ffffff', logging: false, windowWidth: Math.max(document.documentElement.clientWidth, card.scrollWidth + 400),
+          onclone: d => { const c = d.querySelector('.rc-card'); c.style.maxWidth = 'none'; c.style.overflow = 'visible'; c.style.width = 'max-content';
+            d.querySelectorAll('.rc-x, .xmini').forEach(e => e.remove());
+            d.querySelectorAll('td.rc-em').forEach(td => { let t = td.textContent; if (td.scrollWidth <= td.clientWidth) return; while (t.length > 3 && td.scrollWidth > td.clientWidth) { t = t.slice(0, -1); td.textContent = t.trimEnd() + '…'; } }); } });
+        const PW = 595.28, mg = 16, iw = PW - 2 * mg, ih = cv.height * iw / cv.width;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: [PW, ih + 2 * mg], compress: true });
+        pdf.addImage(cv.toDataURL('image/jpeg', 0.9), 'JPEG', mg, mg, iw, ih);
+        doc = pdf; resumoImg = true;
+      }
+      if (!resumoImg) doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
+      if (!resumoImg) {
       addFonts(doc);
       const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 34, AW = W - 2 * M;
       const NAVY = [35, 49, 72], TITLE = [28, 40, 63], HDR = [59, 77, 102], BEIGE = [236, 231, 220], GRAY = [95, 89, 76], LINE = [220, 211, 192], ACC = [190, 174, 139];
@@ -708,6 +724,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
           doc.setFont('PT', 'normal'); doc.setTextColor(...GRAY); doc.text(` · ${SUB}`, x, 30);
           doc.setDrawColor(...LINE); doc.line(M, 40, W - M, 40);
         }
+      }
       }
       const fname = `${isDiario ? 'diario' : full ? 'destaques' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito').replace('destaques:RES', 'resumo_cliente')}_renda_fixa_${D.date.split('/').reverse().join('-')}_taxa_${NIVEL()}.pdf`;
       const blob = doc.output('blob'); window.__lastPdf = blob;
