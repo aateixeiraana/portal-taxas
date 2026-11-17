@@ -122,6 +122,25 @@ td.strong { font-weight: 700; color: var(--title); }
 .prazo tr.first td { border-top: 2px solid var(--navy); }
 .prazo td.rank { color: var(--gray); text-align: center; width: 34px; }
 .prazo tbody tr td { background: var(--paper); }
+.rc-card { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 14px 14px 10px; max-width: 1180px; }
+.rc-head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 10px; }
+.rc-head b { font-family: var(--display); font-size: 18px; color: var(--title); }
+.rc-head span { color: var(--gray); font-size: 13px; }
+.rc-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; align-items: start; }
+@media (max-width: 1100px) { .rc-grid { grid-template-columns: 1fr; } }
+table.rc { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 12px; }
+table.rc th, table.rc td { padding: 2px 6px; border-bottom: 1px solid #fff; white-space: nowrap; }
+table.rc .rc-t th { background: var(--navy); color: #fff; text-align: center; font-size: 12px; letter-spacing: .06em; padding: 4px; }
+table.rc thead tr:nth-child(2) th { background: var(--beige); color: var(--title); font-size: 11px; text-transform: uppercase; position: static; }
+table.rc tbody tr:nth-child(odd) td { background: #F1F2F4; }
+table.rc tbody tr:nth-child(even) td { background: #E6E8EC; }
+table.rc td.c, table.rc th.c { text-align: center; }
+table.rc td.rc-x { background: transparent !important; border: 0; padding: 0 0 0 4px; width: 18px; }
+.xmini { width: 16px; height: 16px; border-radius: 50%; border: 0; background: var(--bad); color: #fff; font-size: 11px; line-height: 16px; padding: 0; cursor: pointer; opacity: .35; }
+table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
+.dot.sim { background: #3E9A74; } .dot.nao { background: #C9503C; }
+.rc-foot { color: var(--gray); font-size: 11px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .prazo tbody tr.zg td:not(.pz) { background: var(--beige); }
 .empty { padding: 26px; text-align: center; color: var(--gray); }
 .matrix td { text-align: right; white-space: nowrap; }
@@ -293,9 +312,61 @@ td.strong { font-weight: 700; color: var(--title); }
   const inSrc = (r, src) => src === 'EB' ? r.c === 'EB' : (r.c === 'CP' || r.c === 'LF');
   const srcBar = () => `<div class="srcbar"><span>Fonte</span><div class="seg" role="group" aria-label="Fonte dos ativos">
       <button type="button" data-src="EB" aria-pressed="${st.src === 'EB'}">Emissão Bancária</button>
-      <button type="button" data-src="CP" aria-pressed="${st.src === 'CP'}">Crédito Privado + LF</button></div>
+      <button type="button" data-src="CP" aria-pressed="${st.src === 'CP'}">Crédito Privado + LF</button>${st.view === 'destaques' ? `<button type="button" data-src="RES" aria-pressed="${st.src === 'RES'}">Resumo para o cliente</button>` : ''}</div>
       ${st.src === 'CP' ? '<span class="hint">CRI, CRA, debêntures, LF e demais, ordenados pelo Gross Up.' + (R.some(r => r.gc) ? ' Nos isentos de crédito privado o Gross Up é calculado no padrão da XP (diferença de até 0,1 p.p. em relação à tela da XP).' : '') + '</span>' : ''}</div>`;
   const empty = src => `<div class="block"><div class="empty">Nenhuma oferta de ${SRCN[src]} com esses filtros.</div></div>`;
+
+  // ---------- Resumo para o cliente (tela única para print) ----------
+  const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const mmyy = r => MES[+r.vd.slice(4, 6) - 1] + '-' + r.vd.slice(2, 4);
+  const byGross = (p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd);
+  function selResumo(rows) {
+    const ok = rows.filter(r => !st.excl.has(emBase(r)));
+    // Sem filtro de rating escolhido, o resumo fica nos emissores de melhor qualidade de crédito
+    const rcOK = (r, lst) => st.rc.size || lst.includes(r.rc);
+    // Crédito privado: público geral; por tipo, a melhor oferta de cada emissor em cada indexador, alternando indexadores
+    const TIPOS = ['DEB', 'CRI', 'CRA', 'CPRF', 'CDCA'], IXO = ['IPCA', 'CDI', 'CDI+', 'PRE'], CAP = 15;
+    const cp = [];
+    TIPOS.forEach(t => {
+      const pool = ok.filter(r => r.c === 'CP' && r.p === 'Geral' && r.t === t && IXO.includes(r.i) && rcOK(r, ['AAA', 'AA']));
+      const best = new Map();
+      pool.sort(byGross).forEach(r => { const k = emBase(r) + '|' + r.i; if (!best.has(k)) best.set(k, r); });
+      const filas = IXO.map(ix => [...best.values()].filter(r => r.i === ix).sort(byGross));
+      const pick = [];
+      while (pick.length < CAP && filas.some(f => f.length)) filas.forEach(f => { if (f.length && pick.length < CAP) pick.push(f.shift()); });
+      cp.push(...pick.sort((p, q) => p.vd.localeCompare(q.vd)));
+    });
+    // Títulos públicos: vencimentos espalhados ao longo da curva
+    const spread = (lst, k) => { if (lst.length <= k) return lst; const out = []; for (let i = 0; i < k; i++) out.push(lst[Math.round(i * (lst.length - 1) / (k - 1 || 1))]); return [...new Set(out)]; };
+    const tpGrupos = [['NTN-B', r => /^NTN-B - /.test(r.a), 6], ['NTN-B PRINC', r => /^NTN-B Principal/.test(r.a), 3], ['LTN', r => /^LTN/.test(r.a), 3], ['NTN-F', r => /^NTN-F - /.test(r.a), 3], ['LFT', r => /^LFT/.test(r.a), 1]];
+    const tp = [];
+    tpGrupos.forEach(([nome, f, k]) => {
+      const m = new Map();
+      ok.filter(r => r.c === 'TP' && f(r)).forEach(r => { const c = m.get(r.vd); if (!c || r.pu > c.pu) m.set(r.vd, r); });
+      const lst = [...m.values()].sort((p, q) => p.vd.localeCompare(q.vd));
+      spread(nome === 'LFT' ? lst.slice(-1) : lst, k).forEach(r => tp.push({ ...r, _tipo: nome }));
+    });
+    // Ativo bancário: em cada indexador, o melhor emissor de cada prazo de 1 a 5 anos
+    const eb = [], seen = new Set();
+    ['IPCA', 'PRE', 'CDI'].forEach(ix => { for (let b = 1; b <= 5; b++) {
+      const r = ok.filter(x => x.c === 'EB' && x.i === ix && x.b === b && rcOK(x, ['AAA', 'AA', 'A'])).sort(byGross)[0];
+      if (r && !seen.has(r.a + r.r0)) { seen.add(r.a + r.r0); eb.push(r); }
+    } });
+    return { cp, tp, eb };
+  }
+  function resumoCliente(rows) {
+    const { cp, tp, eb } = selResumo(rows);
+    const dot = r => `<span class="dot ${r.x ? 'sim' : 'nao'}" title="${r.x ? 'Isento de IR' : 'Tributado'}"></span>`;
+    const tipoDe = r => r._tipo || r.t;
+    const linha = (r, dur) => `<tr><td>${esc(tipoDe(r))}</td><td>${esc(r.c === 'TP' ? 'TESOURO NACIONAL' : emBase(r))}</td><td class="c">${mmyy(r)}</td>${dur ? `<td class="c">${r.du != null ? String(r.du).replace('.', ',') : '-'}</td>` : ''}<td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${esc(r.c === 'TP' ? 'Soberano' : r.rt)}</td>${xr(r)}</tr>`;
+    const tab = (titulo, lst, dur) => lst.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="${dur ? 7 : 6}">${titulo}</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th>${dur ? '<th class="c">DURATION</th>' : ''}<th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">RATING</th></tr></thead><tbody>${lst.map(r => linha(r, dur)).join('')}</tbody></table>` : '';
+    if (!cp.length && !tp.length && !eb.length) return empty('CP');
+    return `<p class="hint">Resumo pronto para print: a melhor oferta de cada emissor por tipo e indexador no crédito privado (público geral, rating AA ou AAA), vencimentos ao longo da curva nos títulos públicos e o melhor emissor de cada prazo de 1 a 5 anos na emissão bancária (rating A ou melhor). Escolhendo um rating nos filtros, vale o filtro. Os filtros e o × valem aqui também.</p>
+      <div class="rc-card"><div class="rc-head"><b>Taxas de Renda Fixa</b><span>Ofertas de ${D.date} · ${label()}</span></div>
+      <div class="rc-grid"><div>${tab('CRÉDITO PRIVADO', cp, true)}</div><div>${tab('TÍTULO PÚBLICO', tp, false)}${tab('ATIVO BANCÁRIO', eb, false)}</div></div>
+      <div class="rc-foot">Taxas indicativas, sujeitas a alteração conforme estoque e condições de mercado. <span class="dot sim"></span> isento de IR · <span class="dot nao"></span> tributado</div></div>`;
+  }
+  const xr = r => `<td class="rc-x"><button type="button" class="xmini" data-ex="${esc(emBase(r))}" title="Tirar ${esc(emBase(r))} do resumo" aria-label="Tirar ${esc(emBase(r))} do resumo">×</button></td>`;
 
   // ---------- Destaques ----------
   function exclBar() {
@@ -388,7 +459,7 @@ td.strong { font-weight: 700; color: var(--title); }
     for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
     return top;
   }
-  const VIEWN = { diario: 'Diário de Renda Fixa', titulos: 'Títulos Públicos', 'destaques:EB': 'Destaques · Emissão Bancária', 'destaques:CP': 'Destaques · Crédito Privado + LF', emissao: 'Emissão Bancária', credito: 'Crédito Privado e Letras Financeiras', 'resumo:EB': 'Resumo por emissor · Emissão Bancária', 'resumo:CP': 'Resumo por emissor · Crédito Privado + LF' };
+  const VIEWN = { diario: 'Diário de Renda Fixa', 'destaques:RES': 'Resumo de Renda Fixa', titulos: 'Títulos Públicos', 'destaques:EB': 'Destaques · Emissão Bancária', 'destaques:CP': 'Destaques · Crédito Privado + LF', emissao: 'Emissão Bancária', credito: 'Crédito Privado e Letras Financeiras', 'resumo:EB': 'Resumo por emissor · Emissão Bancária', 'resumo:CP': 'Resumo por emissor · Crédito Privado + LF' };
   const curKey = () => ['destaques', 'resumo'].includes(st.view) ? st.view + ':' + st.src : st.view;
   const plain = r => r.a + (r.l ? ' · liq. diária' : '');
   const trib = r => r.x ? 'Isento IR' : '-';
@@ -420,6 +491,20 @@ td.strong { font-weight: 700; color: var(--title); }
       return out;
     }
     if (view === 'titulos') return pdfSections(rows.filter(r => r.c === 'TP'), 'diario').filter(x => x.h === 'Títulos Públicos');
+    if (view === 'destaques' && src === 'RES') {
+      const { cp, tp, eb } = selResumo(rows);
+      const isen = r => r.x ? 'Sim' : 'Não';
+      if (cp.length) out.push({ h: 'Crédito Privado', sub: 'Melhor oferta de cada emissor por tipo e indexador · público geral', title: 'CRÉDITO PRIVADO',
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'DURATION', 'TAXA', 'ISENTO', 'RATING'], widths: [.08, .30, .12, .10, .18, .09, .13], right: [], center: [2, 3, 4, 5, 6], bold: [4],
+        body: cp.map(r => [r.t, emBase(r), mmyy(r), r.du != null ? String(r.du).replace('.', ',') : '-', rate(r), isen(r), r.rt]) });
+      if (tp.length) out.push({ h: 'Título Público', sub: 'Vencimentos ao longo da curva', title: 'TÍTULO PÚBLICO',
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'RATING'], widths: [.12, .30, .14, .18, .10, .16], right: [], center: [2, 3, 4, 5], bold: [3],
+        body: tp.map(r => [r._tipo, 'TESOURO NACIONAL', mmyy(r), rate(r), isen(r), 'Soberano']) });
+      if (eb.length) out.push({ h: 'Ativo Bancário', sub: 'Melhor emissor de cada prazo de 1 a 5 anos, por indexador', title: 'ATIVO BANCÁRIO',
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'RATING'], widths: [.10, .32, .14, .18, .10, .16], right: [], center: [2, 3, 4, 5], bold: [3],
+        body: eb.map(r => [r.t, emBase(r), mmyy(r), rate(r), isen(r), r.rt]) });
+      return out;
+    }
     if (view === 'destaques') {
       const eb = rows.filter(r => inSrc(r, src));
       order.filter(k => eb.some(r => r.i === k)).forEach(ix => {
@@ -609,7 +694,7 @@ td.strong { font-weight: 700; color: var(--title); }
           doc.setDrawColor(...LINE); doc.line(M, 40, W - M, 40);
         }
       }
-      const fname = `${isDiario ? 'diario' : full ? 'destaques' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito')}_renda_fixa_${D.date.split('/').reverse().join('-')}_taxa_${NIVEL()}.pdf`;
+      const fname = `${isDiario ? 'diario' : full ? 'destaques' : views[0].replace(':EB', '_emissao').replace(':CP', '_credito').replace('destaques:RES', 'resumo_cliente')}_renda_fixa_${D.date.split('/').reverse().join('-')}_taxa_${NIVEL()}.pdf`;
       const blob = doc.output('blob'); window.__lastPdf = blob;
       if (!window.claude || !window.claude.use) {   // site próprio, fora do Claude: download normal do navegador
         const u = URL.createObjectURL(blob), link = document.createElement('a');
@@ -660,6 +745,7 @@ td.strong { font-weight: 700; color: var(--title); }
     if (views[0] === 'diario') return rows;
     if (views.length > 1) return rows.filter(r => r.c !== 'TP');
     const [v, src] = views[0].split(':');
+    if (src === 'RES') return rows;
     if (v === 'emissao') return rows.filter(r => r.c === 'EB');
     if (v === 'credito') return rows.filter(r => r.c === 'CP' || r.c === 'LF');
     if (v === 'titulos') return rows.filter(r => r.c === 'TP');
@@ -709,7 +795,8 @@ td.strong { font-weight: 700; color: var(--title); }
     $('#n-emissao').textContent = nEB; $('#n-credito').textContent = nCP; $('#n-titulos').textContent = nTP;
     let html = `<div class="summary"><span><b>${rows.length}</b> ativos com os filtros atuais</span><span>${nEB} de Emissão Bancária · ${nCP} de Crédito Privado e LF · ${nTP} de Títulos Públicos</span><span>Exibindo: <b style="font-size:15px">${label()}</b></span></div>`;
     if (st.view === 'destaques' || st.view === 'resumo') html += srcBar();
-    if (st.view === 'destaques') html += exclBar() + destaques(rows);
+    if (st.view === 'resumo' && st.src === 'RES') st.src = 'EB';
+    if (st.view === 'destaques') html += exclBar() + (st.src === 'RES' ? resumoCliente(rows) : destaques(rows));
     else if (st.view === 'emissao') html += table('emissao', rows.filter(r => r.c === 'EB'));
     else if (st.view === 'credito') html += table('credito', rows.filter(r => r.c === 'CP' || r.c === 'LF'));
     else if (st.view === 'titulos') html += table('titulos', rows.filter(r => r.c === 'TP'));
