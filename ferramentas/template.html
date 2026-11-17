@@ -320,8 +320,16 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
   const mmyy = r => MES[+r.vd.slice(4, 6) - 1] + '-' + r.vd.slice(2, 4);
   const byGross = (p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd);
+  // Emissores que a Ana pediu para não aparecer no Resumo para o cliente (só nesta tela). Tipo + nome, comparado pelo começo.
+  const RESUMO_FORA = ['DEB AEGEA', 'CRA IRANI', 'CRI SOMA', 'CRI JHSF', 'CRA USINA BATATAIS', 'CRA CAMIL', 'CRA ZAMP', 'CRA OLFAR', 'CRI SALTA',
+    'CRA LAR COOPERATIVA', 'CRI MOURA DUBEUX', 'CRA REDE SIM', 'CRI MRV', 'CRA FS BIO', 'CRI MITRE', 'CRA EUCATEX', 'CRA BOA SAFRA', 'CRI BRASIL TERRENOS',
+    'CRA MANTIQUEIRA', 'CRA JF CITRUS', 'CRA 3TENTOS', 'CRA VALE DO PONTAL', 'CRA FS FLORESTAL', 'CRA SLC AGRICOLA', 'CRA JALLES MACHADO', 'CRI ALMEIDA JR',
+    'CRA COOXUPE', 'CRI BURITI', 'CRA BEM BRASIL', 'CRI EVEN CONSTRUTORA', 'CPRF DEXCO'];
+  const semAcento = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const foraResumo = r => { const n = semAcento(r.a); return RESUMO_FORA.some(p => n.startsWith(p + ' ') || n.startsWith(p + '-')); };
+  const ehCEF = r => r.c === 'EB' && (/^LCI CEF/.test(r.a) || /^LCD BNDES/.test(r.a));
   function selResumo(rows) {
-    const ok = rows.filter(r => !st.excl.has(emBase(r)));
+    const ok = rows.filter(r => !st.excl.has(emBase(r)) && !foraResumo(r));
     // Sem filtro de rating escolhido, o resumo fica nos emissores de melhor qualidade de crédito
     const rcOK = (r, lst) => st.rc.size || lst.includes(r.rc);
     // Crédito privado: público geral; por tipo, a melhor oferta de cada emissor em cada indexador, alternando indexadores
@@ -349,21 +357,26 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     // Ativo bancário: em cada indexador, o melhor emissor de cada prazo de 1 a 5 anos
     const eb = [], seen = new Set();
     ['IPCA', 'PRE', 'CDI'].forEach(ix => { for (let b = 1; b <= 5; b++) {
-      const r = ok.filter(x => x.c === 'EB' && x.i === ix && x.b === b && rcOK(x, ['AAA', 'AA', 'A'])).sort(byGross)[0];
+      const r = ok.filter(x => x.c === 'EB' && !ehCEF(x) && x.i === ix && x.b === b && rcOK(x, ['AAA', 'AA', 'A'])).sort(byGross)[0];
       if (r && !seen.has(r.a + r.r0)) { seen.add(r.a + r.r0); eb.push(r); }
     } });
-    return { cp, tp, eb };
+    eb.sort((p, q) => p.vd.localeCompare(q.vd) || p.a.localeCompare(q.a));
+    // Ativos da CEF e do BNDES: todas as ofertas do primário, por prazo
+    const cef = ok.filter(ehCEF).sort((p, q) => p.vd.localeCompare(q.vd) || q.n0 - p.n0 || p.pu - q.pu);
+    return { cp, tp, eb, cef };
   }
   function resumoCliente(rows) {
-    const { cp, tp, eb } = selResumo(rows);
+    const { cp, tp, eb, cef } = selResumo(rows);
     const dot = r => `<span class="dot ${r.x ? 'sim' : 'nao'}" title="${r.x ? 'Isento de IR' : 'Tributado'}"></span>`;
     const tipoDe = r => r._tipo || r.t;
     const linha = (r, dur) => `<tr><td>${esc(tipoDe(r))}</td><td>${esc(r.c === 'TP' ? 'TESOURO NACIONAL' : emBase(r))}</td><td class="c">${mmyy(r)}</td>${dur ? `<td class="c">${r.du != null ? String(r.du).replace('.', ',') : '-'}</td>` : ''}<td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${esc(r.c === 'TP' ? 'Soberano' : r.rt)}</td>${xr(r)}</tr>`;
     const tab = (titulo, lst, dur) => lst.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="${dur ? 7 : 6}">${titulo}</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th>${dur ? '<th class="c">DURATION</th>' : ''}<th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">RATING</th></tr></thead><tbody>${lst.map(r => linha(r, dur)).join('')}</tbody></table>` : '';
-    if (!cp.length && !tp.length && !eb.length) return empty('CP');
-    return `<p class="hint">Resumo pronto para print: a melhor oferta de cada emissor por tipo e indexador no crédito privado (público geral, rating AA ou AAA), vencimentos ao longo da curva nos títulos públicos e o melhor emissor de cada prazo de 1 a 5 anos na emissão bancária (rating A ou melhor). Escolhendo um rating nos filtros, vale o filtro. Os filtros e o × valem aqui também.</p>
+    const linhaCef = r => `<tr><td>${esc(r.t)}</td><td>${/BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA'}</td><td class="c">${mmyy(r)}</td><td class="c">${esc(rate(r))}</td><td class="c">${dot(r)}</td><td class="c">${money(r.pu)}</td>${xr(r)}</tr>`;
+    const tabCef = cef.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="6">ATIVOS DA CEF E BNDES</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENCIMENTO</th><th class="c">TAXA</th><th class="c">ISENTO</th><th class="c">P.U.</th></tr></thead><tbody>${cef.map(linhaCef).join('')}</tbody></table>` : '';
+    if (!cp.length && !tp.length && !eb.length && !cef.length) return empty('CP');
+    return `<p class="hint">Resumo pronto para print: a melhor oferta de cada emissor por tipo e indexador no crédito privado (público geral, rating AA ou AAA), vencimentos ao longo da curva nos títulos públicos o melhor emissor de cada prazo de 1 a 5 anos na emissão bancária (rating A ou melhor) e todas as ofertas da CEF e do BNDES, em ordem de prazo. Escolhendo um rating nos filtros, vale o filtro. ${RESUMO_FORA.length} emissores da sua lista ficam fora só desta tela. Os filtros e o × valem aqui também.</p>
       <div class="rc-card"><div class="rc-head"><b>Taxas de Renda Fixa</b><span>Ofertas de ${D.date} · ${label()}</span></div>
-      <div class="rc-grid"><div>${tab('CRÉDITO PRIVADO', cp, true)}</div><div>${tab('TÍTULO PÚBLICO', tp, false)}${tab('ATIVO BANCÁRIO', eb, false)}</div></div>
+      <div class="rc-grid"><div>${tab('CRÉDITO PRIVADO', cp, true)}</div><div>${tab('TÍTULO PÚBLICO', tp, false)}${tab('ATIVO BANCÁRIO', eb, false)}${tabCef}</div></div>
       <div class="rc-foot">Taxas indicativas, sujeitas a alteração conforme estoque e condições de mercado. <span class="dot sim"></span> isento de IR · <span class="dot nao"></span> tributado</div></div>`;
   }
   const xr = r => `<td class="rc-x"><button type="button" class="xmini" data-ex="${esc(emBase(r))}" title="Tirar ${esc(emBase(r))} do resumo" aria-label="Tirar ${esc(emBase(r))} do resumo">×</button></td>`;
@@ -492,7 +505,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     }
     if (view === 'titulos') return pdfSections(rows.filter(r => r.c === 'TP'), 'diario').filter(x => x.h === 'Títulos Públicos');
     if (view === 'destaques' && src === 'RES') {
-      const { cp, tp, eb } = selResumo(rows);
+      const { cp, tp, eb, cef } = selResumo(rows);
       const isen = r => r.x ? 'Sim' : 'Não';
       if (cp.length) out.push({ h: 'Crédito Privado', sub: 'Melhor oferta de cada emissor por tipo e indexador · público geral', title: 'CRÉDITO PRIVADO',
         head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'DURATION', 'TAXA', 'ISENTO', 'RATING'], widths: [.08, .30, .12, .10, .18, .09, .13], right: [], center: [2, 3, 4, 5, 6], bold: [4],
@@ -503,6 +516,9 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
       if (eb.length) out.push({ h: 'Ativo Bancário', sub: 'Melhor emissor de cada prazo de 1 a 5 anos, por indexador', title: 'ATIVO BANCÁRIO',
         head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'RATING'], widths: [.10, .32, .14, .18, .10, .16], right: [], center: [2, 3, 4, 5], bold: [3],
         body: eb.map(r => [r.t, emBase(r), mmyy(r), rate(r), isen(r), r.rt]) });
+      if (cef.length) out.push({ h: 'Ativos da CEF e BNDES', sub: 'Todas as ofertas do primário, por prazo', title: 'ATIVOS DA CEF E BNDES',
+        head: ['TIPO', 'EMISSOR', 'VENCIMENTO', 'TAXA', 'ISENTO', 'P.U.'], widths: [.10, .30, .14, .18, .10, .18], right: [5], center: [2, 3, 4], bold: [3],
+        body: cef.map(r => [r.t, /BNDES/.test(r.a) ? 'BNDES' : 'CAIXA ECONÔMICA', mmyy(r), rate(r), isen(r), money(r.pu)]) });
       return out;
     }
     if (view === 'destaques') {
