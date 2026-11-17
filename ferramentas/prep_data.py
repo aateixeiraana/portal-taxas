@@ -133,7 +133,8 @@ def build(src, data_str):
             recs.append(dict(c=cat, a=nome, e=emissor_de(nome), t=tipo or nome.split()[0], v=v, vd=venc.strftime("%Y%m%d"), b=bucket(venc, hoje),
                              l=0, i=ix, r0=tmin, r1=tmax, n0=n0, n1=n1, g0=g0, g1=g1, m0=m0, m1=m1, gc=gc,
                              pu=brn(pu), am=brn(pu) * brn(q), rt=short_rating(rat), rc=rating_class(rat),
-                             rk=int(risco) if risco.isdigit() else None, x=1 if isento else 0, p=publico))
+                             rk=int(risco) if risco.isdigit() else None, x=1 if isento else 0, p=publico,
+                             du=(float(f[12].replace(',', '.')) if len(f) > 12 and f[12].strip().replace(',', '.').replace('.', '', 1).isdigit() else None)))
     for l in raw.get("tp", "").splitlines():
         a, v, tmin, tmax, pu, q, risco = l.split("~")[:7]
         venc = datetime.strptime(v, "%d/%m/%Y")
