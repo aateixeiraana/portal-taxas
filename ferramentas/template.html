@@ -324,7 +324,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   const RESUMO_FORA = ['DEB AEGEA', 'CRA IRANI', 'CRI SOMA', 'CRI JHSF', 'CRA USINA BATATAIS', 'CRA CAMIL', 'CRA ZAMP', 'CRA OLFAR', 'CRI SALTA',
     'CRA LAR COOPERATIVA', 'CRI MOURA DUBEUX', 'CRA REDE SIM', 'CRI MRV', 'CRA FS BIO', 'CRI MITRE', 'CRA EUCATEX', 'CRA BOA SAFRA', 'CRI BRASIL TERRENOS',
     'CRA MANTIQUEIRA', 'CRA JF CITRUS', 'CRA 3TENTOS', 'CRA VALE DO PONTAL', 'CRA FS FLORESTAL', 'CRA SLC AGRICOLA', 'CRA JALLES MACHADO', 'CRI ALMEIDA JR',
-    'CRA COOXUPE', 'CRI BURITI', 'CRA BEM BRASIL', 'CRI EVEN CONSTRUTORA', 'CPRF DEXCO'];
+    'CRA COOXUPE', 'CRI BURITI', 'CRA BEM BRASIL', 'CRI EVEN CONSTRUTORA', 'CPRF DEXCO','DEB MOVIDA','CRI MOVIDA','CRA MOVIDA','DEB SIMPAR','CRI SIMPAR','CRA SIMPAR','DEB VAMOS','CRI VAMOS','CRA VAMOS','DEB JSL','CRI JSL','CRA JSL'];
   const semAcento = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
   const foraResumo = r => { const n = semAcento(r.a); return RESUMO_FORA.some(p => n.startsWith(p + ' ') || n.startsWith(p + '-')); };
   const ehCEF = r => r.c === 'EB' && (/^LCI CEF/.test(r.a) || /^LCD BNDES/.test(r.a));
