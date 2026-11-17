@@ -31,8 +31,8 @@ Em cada aba, abra o seletor de colunas (ícone de colunas à direita da busca de
 | Aba | Colunas | Chave |
 |---|---|---|
 | Emissão Bancária (clique em **Primário** antes) | Vencimento, Liquidez, Taxa Mín., Taxa Max., Gross Up Mín., Gross Up Max., P.U, Qtd. min, Rating, Risco | `eb` |
-| Crédito Privado | Vencimento, Taxa Mín., Taxa Max., Gross Up Mín., Gross Up Max., P.U, Qtd. min, Rating, Risco, Tipo de produto | `cp` |
-| Letras Fin./LIG | as mesmas do Crédito Privado | `lf` |
+| Crédito Privado | Vencimento, Duration (em anos), Taxa Mín., Taxa Max., Gross Up Mín., Gross Up Max., P.U, Qtd. min, Rating, Tipo de produto | `cp` |
+| Letras Fin./LIG | Vencimento, Taxa Mín., Taxa Max., Gross Up Mín., Gross Up Max., P.U, Qtd. min, Rating, Tipo de produto (sem Duration nessa aba) | `lf` |
 | Títulos Públicos | Vencimento, Taxa Mín., Taxa Max., P.U, Qtd. min, Risco | `tp` |
 
 Depois, em cada aba, rode `__coletar('eb')` (ou `cp`, `lf`, `tp`) uma vez por página, esperando uns 2 segundos entre as chamadas (uma chamada por vez, com `await new Promise(r=>setTimeout(r,1500)); __coletar('cp')`), até o retorno dizer **FIM**. Se uma chamada falhar na extensão, confira a página atual e siga; a função não duplica linhas.

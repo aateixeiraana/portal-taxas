@@ -31,7 +31,7 @@ window.__fmt = {
   // Emissão Bancária: ativo~venc~liquidez~tmin~tmax~gmin~gmax~pu~qtd~rating~risco
   eb: d => { const H = d.hdr, ix = n => H.findIndex(x => x.startsWith(n)); return d.rows.map(r => [r[0].split('#')[0], r[ix('Vencimento')], r[ix('Liquidez')], r[ix('Taxa Mín')], r[ix('Taxa Máx')], r[ix('Gross Up: Taxa Mín')], r[ix('Gross Up: Taxa Máx')], r[ix('P.U')], r[ix('Qtd. min')], r[ix('Rating')], r[ix('Risco')]].join('~')).join('\n'); },
   // Crédito Privado / LF: ativo#icones~venc~ir~tmin~tmax~pu~qtd~rating~risco~tipo~gmin~gmax
-  cp: d => { const H = d.hdr, ix = n => H.findIndex(x => x.startsWith(n)); return d.rows.map(r => [r[0], r[ix('Vencimento')], '', r[ix('Taxa Mín')], r[ix('Taxa Máx')], r[ix('P.U')], r[ix('Qtd. min')], r[ix('Rating')], r[ix('Risco')], r[ix('Tipo de produto')], ix('Gross Up: Taxa Mín') >= 0 ? r[ix('Gross Up: Taxa Mín')] : '', ix('Gross Up: Taxa Máx') >= 0 ? r[ix('Gross Up: Taxa Máx')] : ''].join('~')).join('\n'); },
+  cp: d => { const H = d.hdr, ix = n => H.findIndex(x => x.startsWith(n)); return d.rows.map(r => [r[0], r[ix('Vencimento')], '', r[ix('Taxa Mín')], r[ix('Taxa Máx')], r[ix('P.U')], r[ix('Qtd. min')], r[ix('Rating')], r[ix('Risco')], r[ix('Tipo de produto')], ix('Gross Up: Taxa Mín') >= 0 ? r[ix('Gross Up: Taxa Mín')] : '', ix('Gross Up: Taxa Máx') >= 0 ? r[ix('Gross Up: Taxa Máx')] : '', ix('Duration') >= 0 ? r[ix('Duration')] : ''].join('~')).join('\n'); },
   // Títulos Públicos: ativo~venc~tmin~tmax~pu~qtd~risco
   tp: d => { const H = d.hdr, ix = n => H.findIndex(x => x.startsWith(n)); return d.rows.map(r => [r[0].split('#')[0], r[ix('Vencimento')], r[ix('Taxa Mín')], r[ix('Taxa Máx')], r[ix('P.U')], r[ix('Qtd. min')], r[ix('Risco')]].join('~')).join('\n'); }
 };
