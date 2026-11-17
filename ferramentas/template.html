@@ -374,7 +374,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     const tabCef = cef.length ? `<table class="rc"><thead><tr class="rc-t"><th colspan="7">ATIVOS DA CEF E BNDES</th></tr><tr><th>TIPO</th><th>EMISSOR</th><th class="c">VENC.</th><th class="c">TAXA</th><th class="c">GROSS UP</th><th class="c">ISENTO</th><th class="c">APLIC. MÍN.</th></tr></thead><tbody>${cef.map(linhaCef).join('')}</tbody></table>` : '';
     if (!cp.length && !tp.length && !eb.length && !cef.length) return empty('CP');
     return `<p class="hint">Resumo pronto para print: a melhor oferta de cada emissor por tipo e indexador no crédito privado (público geral, rating AA ou AAA), vencimentos ao longo da curva nos títulos públicos o melhor emissor de cada prazo de 1 a 5 anos na emissão bancária (rating A ou melhor) e todas as ofertas da CEF e do BNDES, em ordem de prazo. Escolhendo um rating nos filtros, vale o filtro. ${RESUMO_FORA.length} emissores da sua lista ficam fora só desta tela. Os filtros e o × valem aqui também.</p>
-      <div class="rc-card"><div class="rc-head"><b>Taxas de Renda Fixa</b><span>Ofertas de ${D.date} · ${label()}</span></div>
+      <div class="rc-card"><div class="rc-head"><b>Taxas de Renda Fixa</b><span>Ofertas de ${D.date}</span></div>
       <div class="rc-grid"><div>${tab('CRÉDITO PRIVADO', cp, true)}</div><div>${tab('TÍTULO PÚBLICO', tp, false, false)}${tab('ATIVO BANCÁRIO', eb, false)}${tabCef}</div></div>
       <div class="rc-foot">Taxas indicativas, sujeitas a alteração conforme estoque e condições de mercado. <span class="dot sim"></span> isento de IR · <span class="dot nao"></span> tributado</div></div>`;
   }
@@ -408,7 +408,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
       }
       return `<section class="block dblock"><div class="block-h"><h2>${IXN[ix]} · ${SRCN[src]}</h2><span>Top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()}</span></div>
         <div class="tw"><table class="prazo"><thead><tr><th>Prazo</th><th class="c">#</th><th>Ativo</th>${isEB ? '' : '<th>Tipo</th><th>Público</th>'}<th>Rating</th><th class="c">Risco XP</th>
-        <th class="num">P.U</th><th class="num">Aplic. mín.</th><th>Vencimento</th><th class="num">${label()}</th><th class="num">Gross Up</th></tr></thead>
+        <th class="num">P.U</th><th class="num">Aplic. mín.</th><th>Vencimento</th><th class="num">Taxa</th><th class="num">Gross Up</th></tr></thead>
         <tbody>${body}</tbody></table></div></section>`;
     }).join('');
   }
