@@ -1,17 +1,18 @@
 import sys, numpy as np
 from PIL import Image
 C,R=320,180
+S=int(sys.argv[3]) if len(sys.argv)>3 else 4
 def decode(path):
     im=np.asarray(Image.open(path).convert('RGB')).astype(int)
     red=(im[:,:,0]>200)&(im[:,:,1]<60)&(im[:,:,2]<60)
     rowc=red.sum(axis=1); colc=red.sum(axis=0)
-    rows=np.where(rowc>300)[0]; cols=np.where(colc>200)[0]
+    rows=np.where(rowc>250)[0]; cols=np.where(colc>150)[0]
     y0,y1,x0,x1=rows.min(),rows.max(),cols.min(),cols.max()
     # canvas outer = C*4+16 by R*4+16 css px
-    sx=(x1-x0+1)/(C*4+16); sy=(y1-y0+1)/(R*4+16)
+    sx=(x1-x0+1)/(C*S+16); sy=(y1-y0+1)/(R*S+16)
     gray=im.mean(axis=2)
     def bit(r,c):
-        cx=x0+(8+c*4+2)*sx; cy=y0+(8+r*4+2)*sy
+        cx=x0+(8+c*S+S/2)*sx; cy=y0+(8+r*S+S/2)*sy
         return 1 if gray[int(round(cy)),int(round(cx))]<128 else 0
     hdr=[bit(0,i) for i in range(96)]
     vals=[int(''.join(map(str,hdr[i*32:(i+1)*32])),2) for i in range(3)]
