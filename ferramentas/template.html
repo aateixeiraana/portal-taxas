@@ -194,7 +194,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
 <div class="wrap">
   <aside class="filters" aria-label="Filtros">
     <h3>Filtros <button id="clear" type="button">Limpar</button></h3>
-    <div class="fg"><label for="q">Buscar emissor ou ativo</label><input type="search" id="q" placeholder="Ex.: Pine, BNDES, NTN"></div>
+    <div class="fg"><label for="q">Buscar emissor ou ativo</label><input type="search" id="q" list="q-list" placeholder="Digite e tecle Enter para somar outro" autocomplete="off"><datalist id="q-list"></datalist><div class="chips" id="q-chips"></div><p class="hint" style="margin:4px 0 0">Selecione mais de um: tecle Enter ou vírgula após cada nome.</p></div>
     <div class="fg"><span class="lbl">Indexador</span><div class="chips" id="f-ix"></div></div>
     <div class="fg"><span class="lbl">Prazo</span><div class="chips" id="f-b"></div></div>
     <div class="fg"><span class="lbl">Tipo de ativo</span><div class="chips" id="f-t"></div></div>
@@ -243,7 +243,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   const IX = [['CDI+','CDI +'],['CDI','% CDI'],['IPCA','IPCA +'],['PRE','Pré-Fixado'],['IGPM','IGP-M'],['SELIC','Selic']];
   const IXN = Object.fromEntries(IX);
   const RC = ['AAA','AA','A','BBB','BB ou menor','Sem rating','Soberano'];
-  const st = { excl: new Set(), src: 'EB', mode: 0, view: 'destaques', q: '', ix: new Set(), b: new Set(), t: new Set(), rc: new Set(), x: new Set(), p: new Set(), am: '', rk: '', l: false, n: 5, sort: {} };
+  const st = { excl: new Set(), src: 'EB', mode: 0, view: 'destaques', q: '', qs: [], ix: new Set(), b: new Set(), t: new Set(), rc: new Set(), x: new Set(), p: new Set(), am: '', rk: '', l: false, n: 5, sort: {} };
   try { const s = JSON.parse(localStorage.getItem('rf-portal') || '{}'); if (s.mode) st.mode = s.mode; if (s.n) st.n = s.n; if (Array.isArray(s.excl)) s.excl.forEach(e => st.excl.add(e)); } catch (e) {}
 
   const $ = s => document.querySelector(s);
@@ -280,14 +280,21 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   chips($('#f-t'), tipos.map(t => [t, t]), st.t);
   chips($('#f-rc'), RC.filter(c => present('rc').includes(c)).map(c => [c, c]), st.rc);
   bindChips($('#f-x'), st.x); bindChips($('#f-p'), st.p);
-  $('#q').addEventListener('input', e => { st.q = e.target.value.trim().toLowerCase(); render(); });
+  const nq = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const qChips = () => { $('#q-chips').innerHTML = st.qs.map((t, i) => `<button type="button" class="chip" aria-pressed="true" data-qi="${i}" title="Tirar ${esc(t)} da busca">${esc(t)} ×</button>`).join(''); };
+  const qAdd = v => { v.split(/[,;]/).map(x => x.trim()).filter(Boolean).forEach(x => { if (!st.qs.some(y => nq(y) === nq(x))) st.qs.push(x); }); $('#q').value = ''; st.q = ''; qChips(); render(); };
+  $('#q-list').innerHTML = [...new Set(R.map(r => r.c === 'TP' ? r.t : r.e))].sort().map(e => `<option value="${esc(e)}">`).join('');
+  $('#q').addEventListener('input', e => { const v = e.target.value; if (/[,;]/.test(v)) return qAdd(v); st.q = nq(v);
+    if (e.inputType === 'insertReplacementText' || (!e.inputType && v)) return qAdd(v); render(); });
+  $('#q').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.value.trim()) { e.preventDefault(); qAdd(e.target.value); } else if (e.key === 'Backspace' && !e.target.value && st.qs.length) { st.qs.pop(); qChips(); render(); } });
+  $('#q-chips').addEventListener('click', e => { const b = e.target.closest('[data-qi]'); if (!b) return; st.qs.splice(+b.dataset.qi, 1); qChips(); render(); });
   $('#f-am').addEventListener('change', e => { st.am = e.target.value; render(); });
   $('#f-rk').addEventListener('change', e => { st.rk = e.target.value; render(); });
   $('#f-l').addEventListener('change', e => { st.l = e.target.checked; render(); });
   $('#f-n').value = String(st.n);
   $('#f-n').addEventListener('change', e => { st.n = +e.target.value; save(); render(); });
   $('#clear').addEventListener('click', () => {
-    ['ix','b','t','rc','x','p'].forEach(k => st[k].clear()); st.q = ''; st.am = ''; st.rk = ''; st.l = false;
+    ['ix','b','t','rc','x','p'].forEach(k => st[k].clear()); st.q = ''; st.qs = []; qChips(); st.am = ''; st.rk = ''; st.l = false;
     document.querySelectorAll('.filters .chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
     $('#q').value = ''; $('#f-am').value = ''; $('#f-rk').value = ''; $('#f-l').checked = false; render();
   });
@@ -296,7 +303,8 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   function save() { try { localStorage.setItem('rf-portal', JSON.stringify({ mode: st.mode, n: st.n, excl: [...st.excl] })); } catch (e) {} }
 
   function pass(r) {
-    if (st.q && !(r.a.toLowerCase().includes(st.q) || r.e.toLowerCase().includes(st.q))) return false;
+    const termos = st.q ? [...st.qs, st.q] : st.qs;
+    if (termos.length) { const alvo = nq(r.a + ' ' + r.e); if (!termos.some(t => alvo.includes(nq(t)))) return false; }
     if (st.ix.size && !st.ix.has(r.i)) return false;
     if (st.b.size && !st.b.has(String(r.b))) return false;
     if (st.t.size && !st.t.has(r.t)) return false;
@@ -582,7 +590,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   }
   function filtrosTexto() {
     const p = [];
-    if (st.q) p.push(`busca "${st.q}"`);
+    const bq = st.q ? [...st.qs, st.q] : st.qs; if (bq.length) p.push('busca ' + bq.map(t => `"${t}"`).join(' ou '));
     if (st.ix.size) p.push('indexador ' + [...st.ix].map(k => IXN[k]).join(', '));
     if (st.b.size) p.push('prazo ' + [...st.b].map(k => BK[+k]).join(', '));
     if (st.t.size) p.push('tipo ' + [...st.t].join(', '));
