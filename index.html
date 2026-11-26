@@ -859,7 +859,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
 
   // ---------- Análise FGC (bancários) ----------
   const FGC_LIM = 250000, FGC_TIPOS = /^(CDB|LCA|LCI|LC|RDB|LH)\b/;
-  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '', pz: new Set() };
+  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '', pz: new Set(), ano: new Set() };
   const STOP = new Set(['BANCO','BANK','S.A.','S.A','SA','S/A','S/','LTDA','FINANCEIRA','FINANCIAMENTOS','FINANCIADOR','CONSIGNADO','SCFI','CFI','SCD','SOCIEDADE','DE','DO','DA','CREDITO','CRÉDITO','(BRASIL)','BRASIL','-','GRUPO','INVESTIMENTO','MULTIPLO','MÚLTIPLO','CAPITAL']);
   const ALIAS = { 'CAIXA': 'CAIXA', 'CEF': 'CAIXA' };
   const fgcKey = nome => { const s = semAcento(nome.replace(/ - [A-Z]{3}\/\d{4}.*$/, '').replace(FGC_TIPOS, '')).replace(/[.,]/g, m => m === '.' ? '.' : ' ');
@@ -955,7 +955,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   // Card: melhores taxas de hoje onde a cliente ainda tem espaço (um emissor por linha, 6 meses a 5 anos)
   function fgcMelhores(G) {
     const porKey = Object.fromEntries(G.map(g => [g.key, g]));
-    const ofs = R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a) && r.b <= 5 && (!fgc.pz.size || fgc.pz.has(r.b))).map(r => {
+    const ofs = R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a) && (fgc.ano.size ? fgc.ano.has(r.vd.slice(0, 4)) : r.b <= 5) && (!fgc.pz.size || fgc.pz.has(r.b))).map(r => {
       const key = fgcKey(emBase(r)), g = porKey[key], T = anos(new Date(+r.vd.slice(0, 4), +r.vd.slice(4, 6) - 1, +r.vd.slice(6, 8)));
       return { r, key, tem: !!g, max: maxNova(g ? g.ps : [], r.i, rnum(r), T) };
     }).filter(o => o.max >= Math.max(1000, o.r.am || 0));
@@ -966,7 +966,8 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
         ${top.map(o => `<tr><td>${esc(o.r.a)}${o.r.x ? ' <span class="tag">Isento IR</span>' : ''}${o.tem ? ' <small>· já possui</small>' : ''}</td><td>${esc(o.r.rt)}</td><td class="num">${esc(rate(o.r))}</td><td class="num"><b>${esc(gross(o.r))}</b></td><td class="num">${money(o.max)}</td></tr>`).join('')}</tbody></table></div>` : '';
     }).join('');
     return `<div class="fgc-best"><div class="block-h"><h2>Melhores taxas de hoje onde ela tem espaço</h2><span>Bancários com FGC · top 7 emissores por indexador, ordenado pelo Gross Up · ${label()}</span></div>
-      <div class="fgc-pz"><span>Prazo:</span>${BK.slice(0, 6).map((t, i) => `<button type="button" class="chip" data-fpz="${i}" aria-pressed="${fgc.pz.has(i)}">${t}</button>`).join('')}${fgc.pz.size ? '<button type="button" class="chip" data-fpz="x">Todos</button>' : '<small>todos de 6 meses a 5 anos</small>'}</div><div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
+      <div class="fgc-pz"><span>Prazo:</span>${BK.slice(0, 6).map((t, i) => `<button type="button" class="chip" data-fpz="${i}" aria-pressed="${fgc.pz.has(i)}">${t}</button>`).join('')}${fgc.pz.size ? '<button type="button" class="chip" data-fpz="x">Todos</button>' : '<small>todos de 6 meses a 5 anos</small>'}</div>
+      <div class="fgc-pz"><span>Ano de vencimento:</span>${[...new Set(R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a)).map(r => r.vd.slice(0, 4)))].sort().map(y => `<button type="button" class="chip" data-fano="${y}" aria-pressed="${fgc.ano.has(y)}">${y}</button>`).join('')}${fgc.ano.size ? '<button type="button" class="chip" data-fano="x">Todos</button>' : ''}</div><div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
   }
   async function fgcLoad(file) {
     try {
@@ -981,7 +982,8 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   function fgcBind() {
     const f = $('#fgc-file'); if (!f) return;
     f.addEventListener('change', e => e.target.files[0] && fgcLoad(e.target.files[0]));
-    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set(), pz: new Set() }); render(); });
+    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set(), pz: new Set(), ano: new Set() }); render(); });
+    $('#main').querySelectorAll('[data-fano]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.fano; if (v === 'x') fgc.ano.clear(); else fgc.ano.has(v) ? fgc.ano.delete(v) : fgc.ano.add(v); render(); }));
     $('#main').querySelectorAll('[data-fpz]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.fpz; if (v === 'x') fgc.pz.clear(); else { const i = +v; fgc.pz.has(i) ? fgc.pz.delete(i) : fgc.pz.add(i); } render(); }));
     ['cdi', 'ipca'].forEach(k => $('#fgc-' + k).addEventListener('change', e => { fgc[k] = parseFloat(e.target.value) || 0; render(); }));
     $('#main').querySelectorAll('[data-fk]').forEach(tr => tr.addEventListener('click', () => { const k = tr.dataset.fk; fgc.open.has(k) ? fgc.open.delete(k) : fgc.open.add(k); render(); }));
