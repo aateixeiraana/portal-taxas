@@ -91,6 +91,7 @@ td.xcell { position: relative; }
 .fgc-cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; } .fgc-cols h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); }
 .tbl.mini { font-size: 12.5px; margin-bottom: 10px; } .fgc-nota { padding: 10px 16px 16px; line-height: 1.45; }
 .fgc-pz { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 12px 16px 0; } .fgc-pz span { font-weight: 600; margin-right: 4px; } .fgc-pz small { color: var(--gray); margin-left: 6px; }
+.venc-t td.vz { color: #b9b4a8; } .venc-t td.pct { color: #b08d3c; font-weight: 600; } .venc-t tfoot td { background: var(--navy); color: #fff; font-weight: 700; padding: 6px 8px; } .venc-t td, .venc-t th { white-space: nowrap; }
 .fgc-best { margin: 18px 16px 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; } .fgc-best-g { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; padding: 12px 16px 4px; } .fgc-best h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; color: var(--navy); } .tag { border: 1px solid #2e7d4f; color: #2e7d4f; border-radius: 999px; padding: 0 6px; font-size: 11px; }
 @media (max-width: 1000px) { .fgc-best-g { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .fgc-cols { grid-template-columns: 1fr; } }
@@ -859,13 +860,13 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
 
   // ---------- Análise FGC (bancários) ----------
   const FGC_LIM = 250000, FGC_TIPOS = /^(CDB|LCA|LCI|LC|RDB|LH)\b/;
-  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '', pz: new Set(), ano: new Set() };
+  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '', pz: new Set(), ano: new Set(), vencs: [], patr: 0 };
   const STOP = new Set(['BANCO','BANK','S.A.','S.A','SA','S/A','S/','LTDA','FINANCEIRA','FINANCIAMENTOS','FINANCIADOR','CONSIGNADO','SCFI','CFI','SCD','SOCIEDADE','DE','DO','DA','CREDITO','CRÉDITO','(BRASIL)','BRASIL','-','GRUPO','INVESTIMENTO','MULTIPLO','MÚLTIPLO','CAPITAL']);
   const ALIAS = { 'CAIXA': 'CAIXA', 'CEF': 'CAIXA' };
   const fgcKey = nome => { const s = semAcento(nome.replace(/ - [A-Z]{3}\/\d{4}.*$/, '').replace(FGC_TIPOS, '')).replace(/[.,]/g, m => m === '.' ? '.' : ' ');
     const w = s.split(/\s+/).filter(x => x && !STOP.has(x)); const k = w[0] || s.trim(); return ALIAS[k] || k; };
   const fgcNome = nome => nome.replace(/ - [A-Z]{3}\/\d{4}.*$/, '').replace(FGC_TIPOS, '').trim();
-  const brNum = v => typeof v === 'number' ? v : parseFloat(String(v).replace(/[R$\s%+]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+  const brNum = v => typeof v === 'number' ? v : /^-?\d+(\.\d+)?$/.test(String(v).trim()) ? parseFloat(v) : parseFloat(String(v).replace(/[R$\s%+]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
   const brData = s => { const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null; };
   const HOJE = (() => { const [d, m, y] = D.date.split('/'); return new Date(+y, +m - 1, +d); })();
   const anos = dt => (dt - HOJE) / 864e5 / 365;
@@ -901,6 +902,24 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
       out.push({ nome, tipo: nome.split(' ')[0], emissor: fgcNome(nome), key: fgcKey(nome), apl: brData(cells[map.a]), venc: brData(cells[map.v]), taxa: cells[map.t], ix, n, aplicado: brNum(cells[map.ap]), pos: brNum(cells[map.p]) });
     });
     return { pos: out, conta };
+  }
+  // Todos os vencimentos de Renda Fixa, Tesouro Direto e COE, e o patrimônio total
+  function lerVencimentos(rows) {
+    const out = []; let map = null, sec = '', patr = 0, pegaPatr = false;
+    rows.forEach(r => {
+      const c = r.map(x => x == null ? '' : String(x).trim());
+      if (pegaPatr) { const v = c.map(brNum).find(v => v > 0); if (v) patr = v; pegaPatr = false; }
+      if (c.some(x => /patrim[oô]nio/i.test(x))) { pegaPatr = true; return; }
+      const f = c.find(x => x) || '';
+      if (/^[\d,.]+%\|/.test(f)) { const nome = f.split('|')[1]; if (c.slice(1).some(x => /^R\$/.test(x))) { sec = nome; map = null; return; } }
+      const iV = c.indexOf('Vencimento'), iP = c.indexOf('Posição');
+      if (iV >= 0 && iP >= 0) { map = { v: iV, p: iP }; return; }
+      if (!map || !/Renda Fixa|Tesouro|COE/i.test(sec)) return;
+      const nome = c[0] || f; const d = brData(c[map.v]), v = brNum(c[map.p]);
+      if (!d || !(v > 0) || /\|/.test(nome)) return;
+      out.push({ nome, sec: /COE/i.test(sec) ? 'COE' : /Tesouro/i.test(sec) ? 'Tesouro Direto' : 'Renda Fixa', venc: d, v });
+    });
+    return { vencs: out, patr };
   }
   // exposição bruta projetada do conglomerado na data t (anos); incluiVenc: conta quem vence exatamente em t
   const expo = (ps, t) => ps.reduce((s, p) => s + (anos(p.venc) >= t - 1e-9 ? p.pos * fator(p.ix, p.n, Math.min(t, anos(p.venc))) : 0), 0);
@@ -949,7 +968,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
           ${g.ofertas.map(o => `<tr><td>${esc(o.r.a)}</td><td>${esc(rate(o.r))}</td><td>${esc(gross(o.r))}</td><td class="num${o.max < 1000 ? ' neg' : ''}"><b>${money(o.max)}</b></td></tr>`).join('')}</tbody></table>` : '<p class="hint">Sem oferta deste emissor no primário hoje.</p>'}</div></div></td></tr>`;
       }
     });
-    h += `</tbody></table>` + fgcMelhores(G) + `<p class="hint fgc-nota">Posição hoje e valores projetados são brutos, como o FGC considera. "Nova aplic." é o maior valor que dá para aplicar hoje, a 100% do CDI, sem que o total do conglomerado passe de R$ 250 mil em nenhum momento até o prazo, já contando o rendimento das aplicações atuais e os vencimentos no caminho. Na oferta, o cálculo usa a taxa da própria oferta. Conglomerados são agrupados pelo nome do emissor (ex.: Omni Banco e Omni Financeira); confira grupos com nomes diferentes. Há também o teto global de R$ 1 milhão a cada 4 anos por CPF. Projeções em dias corridos e taxas indicativas.</p></section>`;
+    h += `</tbody></table>` + fgcVenc() + fgcMelhores(G) + `<p class="hint fgc-nota">Posição hoje e valores projetados são brutos, como o FGC considera. "Nova aplic." é o maior valor que dá para aplicar hoje, a 100% do CDI, sem que o total do conglomerado passe de R$ 250 mil em nenhum momento até o prazo, já contando o rendimento das aplicações atuais e os vencimentos no caminho. Na oferta, o cálculo usa a taxa da própria oferta. Conglomerados são agrupados pelo nome do emissor (ex.: Omni Banco e Omni Financeira); confira grupos com nomes diferentes. Há também o teto global de R$ 1 milhão a cada 4 anos por CPF. Projeções em dias corridos e taxas indicativas.</p></section>`;
     return h;
   }
   // Card: melhores taxas de hoje onde a cliente ainda tem espaço (um emissor por linha, 6 meses a 5 anos)
@@ -969,20 +988,38 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
       <div class="fgc-pz"><span>Prazo:</span>${BK.slice(0, 6).map((t, i) => `<button type="button" class="chip" data-fpz="${i}" aria-pressed="${fgc.pz.has(i)}">${t}</button>`).join('')}${fgc.pz.size ? '<button type="button" class="chip" data-fpz="x">Todos</button>' : '<small>todos de 6 meses a 5 anos</small>'}</div>
       <div class="fgc-pz"><span>Ano de vencimento:</span>${[...new Set(R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a)).map(r => r.vd.slice(0, 4)))].sort().map(y => `<button type="button" class="chip" data-fano="${y}" aria-pressed="${fgc.ano.has(y)}">${y}</button>`).join('')}${fgc.ano.size ? '<button type="button" class="chip" data-fano="x">Todos</button>' : ''}</div><div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
   }
+  // Card de vencimentos: ano x mês, % sobre o patrimônio total da carteira
+  function fgcVenc() {
+    if (!fgc.vencs.length) return '';
+    const M = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+    const tot = fgc.patr || fgc.vencs.reduce((s, x) => s + x.v, 0);
+    const anosV = [...new Set(fgc.vencs.map(x => x.venc.getFullYear()))].sort();
+    const cel = (lst, cls = '') => lst.length ? `<td class="num${cls}" title="${esc(lst.map(x => x.nome + ': ' + money(x.v)).join('\n'))}">${money(lst.reduce((s, x) => s + x.v, 0))}</td>` : '<td class="num vz">-</td>';
+    let h = `<div class="fgc-best fgc-venc"><div class="block-h"><h2>Renda Fixa com vencimentos provisionados</h2><span>Renda fixa (bancários, crédito privado, títulos públicos), Tesouro Direto e COE · posição bruta de hoje · % sobre o patrimônio total de ${money(tot)}</span></div>
+      <div style="overflow-x:auto;padding:12px 16px 4px"><table class="tbl mini venc-t"><thead><tr><th>Ano</th>${M.map(m => `<th class="num">${m}</th>`).join('')}<th class="num">Financeiro</th><th class="num">%</th></tr></thead><tbody>`;
+    anosV.forEach(a => {
+      const ls = fgc.vencs.filter(x => x.venc.getFullYear() === a), v = ls.reduce((s, x) => s + x.v, 0);
+      h += `<tr><td><b>${a}</b></td>${M.map((_, m) => cel(ls.filter(x => x.venc.getMonth() === m))).join('')}<td class="num"><b>${money(v)}</b></td><td class="num pct">${(v / tot * 100).toFixed(1).replace('.', ',')}%</td></tr>`;
+    });
+    const all = fgc.vencs, vt = all.reduce((s, x) => s + x.v, 0);
+    h += `</tbody><tfoot><tr><td>TOTAL</td>${M.map((_, m) => { const l = all.filter(x => x.venc.getMonth() === m); return `<td class="num">${l.length ? money(l.reduce((s, x) => s + x.v, 0)) : '-'}</td>`; }).join('')}<td class="num">${money(vt)}</td><td class="num">${(vt / tot * 100).toFixed(1).replace('.', ',')}%</td></tr></tfoot></table></div>
+      <p class="hint" style="padding:0 16px 12px">Passe o mouse sobre um valor para ver os ativos. ${[...new Set(all.map(x => x.sec))].map(sc => sc + ': ' + money(all.filter(x => x.sec === sc).reduce((s, x) => s + x.v, 0))).join(' · ')}. O restante do patrimônio está em ações, fundos, FIIs e saldo.</p></div>`;
+    return h;
+  }
   async function fgcLoad(file) {
     try {
       if (!window.XLSX) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = () => ko(new Error('não consegui carregar o leitor de Excel')); document.head.appendChild(s); });
       const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
       let rows = []; wb.SheetNames.forEach(n => rows = rows.concat(XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' })));
-      const { pos, conta } = lerCarteira(rows);
-      Object.assign(fgc, { file: file.name, conta, pos, erro: pos.length ? '' : 'Não encontrei CDB, LCA, LCI, LC, RDB ou LH neste arquivo. Confira se é a Posição Consolidada do Hub.', open: new Set() });
+      const { pos, conta } = lerCarteira(rows); const { vencs, patr } = lerVencimentos(rows);
+      Object.assign(fgc, { file: file.name, conta, pos, vencs, patr, erro: pos.length ? '' : 'Não encontrei CDB, LCA, LCI, LC, RDB ou LH neste arquivo. Confira se é a Posição Consolidada do Hub.', open: new Set() });
     } catch (e) { fgc.erro = 'Erro ao ler o arquivo: ' + e.message; }
     render();
   }
   function fgcBind() {
     const f = $('#fgc-file'); if (!f) return;
     f.addEventListener('change', e => e.target.files[0] && fgcLoad(e.target.files[0]));
-    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set(), pz: new Set(), ano: new Set() }); render(); });
+    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set(), pz: new Set(), ano: new Set(), vencs: [], patr: 0 }); render(); });
     $('#main').querySelectorAll('[data-fano]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.fano; if (v === 'x') fgc.ano.clear(); else fgc.ano.has(v) ? fgc.ano.delete(v) : fgc.ano.add(v); render(); }));
     $('#main').querySelectorAll('[data-fpz]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.fpz; if (v === 'x') fgc.pz.clear(); else { const i = +v; fgc.pz.has(i) ? fgc.pz.delete(i) : fgc.pz.add(i); } render(); }));
     ['cdi', 'ipca'].forEach(k => $('#fgc-' + k).addEventListener('change', e => { fgc[k] = parseFloat(e.target.value) || 0; render(); }));
