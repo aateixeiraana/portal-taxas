@@ -197,6 +197,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     <div class="fg"><label for="q">Buscar emissor ou ativo</label><input type="search" id="q" list="q-list" placeholder="Digite e tecle Enter para somar outro" autocomplete="off"><datalist id="q-list"></datalist><div class="chips" id="q-chips"></div><p class="hint" style="margin:4px 0 0">Selecione mais de um: tecle Enter ou vírgula após cada nome.</p></div>
     <div class="fg"><span class="lbl">Indexador</span><div class="chips" id="f-ix"></div></div>
     <div class="fg"><span class="lbl">Prazo</span><div class="chips" id="f-b"></div></div>
+    <div class="fg"><span class="lbl">Ano de vencimento</span><div class="chips" id="f-ano"></div></div>
     <div class="fg"><span class="lbl">Tipo de ativo</span><div class="chips" id="f-t"></div></div>
     <div class="fg"><span class="lbl">Rating</span><div class="chips" id="f-rc"></div></div>
     <div class="fg"><label for="f-am">Aplicação mínima até</label>
@@ -243,7 +244,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   const IX = [['CDI+','CDI +'],['CDI','% CDI'],['IPCA','IPCA +'],['PRE','Pré-Fixado'],['IGPM','IGP-M'],['SELIC','Selic']];
   const IXN = Object.fromEntries(IX);
   const RC = ['AAA','AA','A','BBB','BB ou menor','Sem rating','Soberano'];
-  const st = { excl: new Set(), src: 'EB', mode: 0, view: 'destaques', q: '', qs: [], ix: new Set(), b: new Set(), t: new Set(), rc: new Set(), x: new Set(), p: new Set(), am: '', rk: '', l: false, n: 5, sort: {} };
+  const st = { excl: new Set(), src: 'EB', mode: 0, view: 'destaques', q: '', qs: [], ano: new Set(), ix: new Set(), b: new Set(), t: new Set(), rc: new Set(), x: new Set(), p: new Set(), am: '', rk: '', l: false, n: 5, sort: {} };
   try { const s = JSON.parse(localStorage.getItem('rf-portal') || '{}'); if (s.mode) st.mode = s.mode; if (s.n) st.n = s.n; if (Array.isArray(s.excl)) s.excl.forEach(e => st.excl.add(e)); } catch (e) {}
 
   const $ = s => document.querySelector(s);
@@ -276,6 +277,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   const present = k => [...new Set(R.map(r => r[k]))];
   chips($('#f-ix'), IX.filter(([k]) => present('i').includes(k)), st.ix);
   chips($('#f-b'), BK.map((t, i) => [String(i), t]), st.b);
+  chips($('#f-ano'), [...new Set(R.map(r => r.vd.slice(0, 4)))].sort().map(y => [y, y]), st.ano);
   const tipos = present('t').sort((a, b) => R.filter(r => r.t === b).length - R.filter(r => r.t === a).length);
   chips($('#f-t'), tipos.map(t => [t, t]), st.t);
   chips($('#f-rc'), RC.filter(c => present('rc').includes(c)).map(c => [c, c]), st.rc);
@@ -294,7 +296,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   $('#f-n').value = String(st.n);
   $('#f-n').addEventListener('change', e => { st.n = +e.target.value; save(); render(); });
   $('#clear').addEventListener('click', () => {
-    ['ix','b','t','rc','x','p'].forEach(k => st[k].clear()); st.q = ''; st.qs = []; qChips(); st.am = ''; st.rk = ''; st.l = false;
+    ['ix','b','t','rc','x','p','ano'].forEach(k => st[k].clear()); st.q = ''; st.qs = []; qChips(); st.am = ''; st.rk = ''; st.l = false;
     document.querySelectorAll('.filters .chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
     $('#q').value = ''; $('#f-am').value = ''; $('#f-rk').value = ''; $('#f-l').checked = false; render();
   });
@@ -307,6 +309,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     if (termos.length) { const alvo = nq(r.a + ' ' + r.e); if (!termos.some(t => alvo.includes(nq(t)))) return false; }
     if (st.ix.size && !st.ix.has(r.i)) return false;
     if (st.b.size && !st.b.has(String(r.b))) return false;
+    if (st.ano.size && !st.ano.has(r.vd.slice(0, 4))) return false;
     if (st.t.size && !st.t.has(r.t)) return false;
     if (st.rc.size && !st.rc.has(r.rc)) return false;
     if (st.x.size && !st.x.has(String(r.x))) return false;
@@ -408,18 +411,18 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     return ixs.map(ix => {
       const sub = eb.filter(r => r.i === ix);
       let body = '';
-      for (let b = 0; b <= 5; b++) {   // destaques: de 6 meses até 5 anos
-        const pool = sub.filter(r => r.b === b).sort((p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd));
+      for (const b of gKeys()) {   // destaques: de 6 meses até 5 anos, ou por ano de vencimento
+        const pool = sub.filter(r => gHas(r, b)).sort((p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd));
         const top = [], seen = new Set();
         for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
         top.forEach((r, k) => {
-          body += `<tr class="${k === 0 ? 'first ' : ''}${k % 2 === 0 ? 'zg' : ''}">${k === 0 ? `<td class="pz" rowspan="${top.length}">${BK[b]}</td>` : ''}
+          body += `<tr class="${k === 0 ? 'first ' : ''}${k % 2 === 0 ? 'zg' : ''}">${k === 0 ? `<td class="pz" rowspan="${top.length}">${gLbl(b)}</td>` : ''}
             <td class="rank">${k + 1}</td><td>${name(r)}</td>${isEB ? '' : `<td>${esc(r.t)}</td><td>${esc(r.p)}</td>`}<td>${esc(r.rt)}</td><td class="c">${risk(r.rk)}</td>
             <td class="num">${money(r.pu)}</td><td class="num">${money(r.am)}</td><td>${r.v}</td>
             <td class="num">${esc(rate(r))}</td><td class="num strong xcell">${esc(gross(r))}${xb(r)}</td></tr>`;
         });
       }
-      return `<section class="block dblock"><div class="block-h"><h2>${IXN[ix]} · ${SRCN[src]}</h2><span>Top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()}</span></div>
+      return `<section class="block dblock"><div class="block-h"><h2>${IXN[ix]} · ${SRCN[src]}</h2><span>Top ${st.n} emissores ${st.ano.size ? 'por ano de vencimento' : 'por prazo, de 6 meses a 5 anos'} · ordenado pelo Gross Up${lowx()}</span></div>
         <div class="tw"><table class="prazo"><thead><tr><th>Prazo</th><th class="c">#</th><th>Ativo</th>${isEB ? '' : '<th>Tipo</th><th>Público</th>'}<th>Rating</th><th class="c">Risco XP</th>
         <th class="num">P.U</th><th class="num">Aplic. mín.</th><th>Vencimento</th><th class="num">Taxa</th><th class="num">Gross Up</th></tr></thead>
         <tbody>${body}</tbody></table></div></section>`;
@@ -478,8 +481,12 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   }
 
   // ---------- PDF (mesmo visual do Diário de Renda Fixa) ----------
+  // Destaques: por prazo (6 meses a 5 anos) ou, com filtro de ano, por ano de vencimento
+  const gKeys = () => st.ano.size ? [...st.ano].sort() : [0, 1, 2, 3, 4, 5];
+  const gHas = (r, b) => typeof b === 'string' ? r.vd.slice(0, 4) === b : r.b === b;
+  const gLbl = b => typeof b === 'string' ? 'Venc. ' + b : BK[b];
   function rankDest(sub, b) {
-    const pool = sub.filter(r => r.b === b).sort((p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd));
+    const pool = sub.filter(r => gHas(r, b)).sort((p, q) => (gnum(q) - gnum(p)) || (p.am - q.am) || p.vd.localeCompare(q.vd));
     const top = [], seen = new Set();
     for (const r of pool) { if (seen.has(r.e)) continue; seen.add(r.e); top.push(r); if (top.length === st.n) break; }
     return top;
@@ -538,20 +545,20 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
       order.filter(k => eb.some(r => r.i === k)).forEach(ix => {
         const sub = eb.filter(r => r.i === ix), body = [], groups = [];
         let g = 0;
-        for (let b = 0; b <= 5; b++) {
+        for (const b of gKeys()) {
           const top = rankDest(sub, b);
           if (!top.length) continue;
-          top.forEach((r, k) => { groups.push(g); body.push([...(k === 0 ? [{ content: BK[b].toUpperCase(), rowSpan: top.length, styles: { valign: 'middle' } }] : []),
+          top.forEach((r, k) => { groups.push(g); body.push([...(k === 0 ? [{ content: gLbl(b).toUpperCase(), rowSpan: top.length, styles: { valign: 'middle' } }] : []),
             String(k + 1), plain(r), ...(isEBsrc ? [] : [r.t]), trib(r), r.rt, r.rk == null ? '-' : String(r.rk), money(r.pu), money(r.am), r.v, rate(r), gross(r)]); });
           g++;
         }
         if (!body.length) return;
-        const t = `${IXN[ix]} · Top ${st.n} por prazo`;
+        const t = `${IXN[ix]} · Top ${st.n} por ${st.ano.size ? 'ano de vencimento' : 'prazo'}`;
         out.push(isEBsrc
-          ? { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${lowx()}`, title: t,
+          ? { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores ${st.ano.size ? 'por ano de vencimento' : 'por prazo, de 6 meses a 5 anos'} · ordenado pelo Gross Up${lowx()}`, title: t,
               head: ['PRAZO', '#', 'ATIVO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.07, .03, .25, .075, .075, .055, .085, .09, .08, .10, .10], body, groups, right: [6, 7, 9, 10], center: [1, 5, 8], bold: [0, 10] }
-          : { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores por prazo, de 6 meses a 5 anos · ordenado pelo Gross Up${R.some(r => r.gc) ? ' (isentos: Gross Up calculado no padrão da XP)' : ''}`, title: t,
+          : { h: IXN[ix], sub: `${SRCN[src]} · top ${st.n} emissores ${st.ano.size ? 'por ano de vencimento' : 'por prazo, de 6 meses a 5 anos'} · ordenado pelo Gross Up${R.some(r => r.gc) ? ' (isentos: Gross Up calculado no padrão da XP)' : ''}`, title: t,
               head: ['PRAZO', '#', 'ATIVO', 'TIPO', 'TRIBUTAÇÃO', 'RATING', 'RISCO XP', 'P.U', 'APLIC. MÍN.', 'VENCIMENTO', 'TAXA', 'GROSS UP'],
               widths: [.065, .03, .23, .045, .075, .07, .055, .085, .085, .075, .095, .095], body, groups, right: [7, 8, 10, 11], center: [1, 6, 9], bold: [0, 11] });
       });
@@ -593,6 +600,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     const bq = st.q ? [...st.qs, st.q] : st.qs; if (bq.length) p.push('busca ' + bq.map(t => `"${t}"`).join(' ou '));
     if (st.ix.size) p.push('indexador ' + [...st.ix].map(k => IXN[k]).join(', '));
     if (st.b.size) p.push('prazo ' + [...st.b].map(k => BK[+k]).join(', '));
+    if (st.ano.size) p.push('vencimento em ' + [...st.ano].sort().join(', '));
     if (st.t.size) p.push('tipo ' + [...st.t].join(', '));
     if (st.rc.size) p.push('rating ' + [...st.rc].join(', '));
     if (st.am) p.push('aplicação mínima até ' + money(+st.am));
