@@ -90,6 +90,8 @@ td.xcell { position: relative; }
 .fgc-t small { color: var(--gray); font-weight: 400; } .fgc-det > td { background: #faf8f3; padding: 12px 16px !important; }
 .fgc-cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; } .fgc-cols h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); }
 .tbl.mini { font-size: 12.5px; margin-bottom: 10px; } .fgc-nota { padding: 10px 16px 16px; line-height: 1.45; }
+.fgc-best { margin: 18px 16px 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; } .fgc-best-g { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; padding: 12px 16px 4px; } .fgc-best h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; color: var(--navy); } .tag { border: 1px solid #2e7d4f; color: #2e7d4f; border-radius: 999px; padding: 0 6px; font-size: 11px; }
+@media (max-width: 1000px) { .fgc-best-g { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .fgc-cols { grid-template-columns: 1fr; } }
 .wrap { max-width: 1440px; margin: 0 auto; padding: 18px 20px 40px; display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
@@ -924,7 +926,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   function fgcView() {
     let h = `<section class="block fgc"><div class="block-h"><h2>Análise de carteira · espaço no FGC (bancários)</h2><span>Limite de R$ 250 mil por CPF e por conglomerado</span></div><div class="fgc-in">
       <div class="fgc-up"><label class="pdfbtn" for="fgc-file">Carregar Posição Consolidada (Excel)</label><input type="file" id="fgc-file" accept=".xlsx,.xls" hidden>
-      <span>${fgc.file ? `<b>${esc(fgc.file)}</b>${fgc.conta ? ' · conta ' + esc(fgc.conta) : ''} · ${fgc.pos.length} aplicações bancárias com FGC` : 'Exporte a Posição Consolidada do cliente no Hub e carregue aqui. O arquivo é lido só no seu navegador, nada é enviado.'}</span></div>
+      ${fgc.file || fgc.erro ? '<button type="button" class="pdfbtn" id="fgc-clear">Limpar análise</button>' : ''}<span>${fgc.file ? `<b>${esc(fgc.file)}</b>${fgc.conta ? ' · conta ' + esc(fgc.conta) : ''} · ${fgc.pos.length} aplicações bancárias com FGC` : 'Exporte a Posição Consolidada do cliente no Hub e carregue aqui. O arquivo é lido só no seu navegador, nada é enviado.'}</span></div>
       <div class="fgc-par">Projeção: CDI <input id="fgc-cdi" type="number" step="0.05" value="${fgc.cdi}">% a.a. · IPCA <input id="fgc-ipca" type="number" step="0.05" value="${fgc.ipca}">% a.a. · nova aplicação de referência: 100% do CDI</div>
       ${fgc.erro ? `<p class="aviso-tp">${esc(fgc.erro)}</p>` : ''}</div>`;
     if (!fgc.pos.length) return h + `<p class="hint" style="padding:0 16px 16px">Entram na conta CDB, LCA, LCI, LC, RDB e LH. LF, LCD, CRI, CRA, debêntures, títulos públicos e COE não têm FGC e ficam fora.</p></section>`;
@@ -946,8 +948,23 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
           ${g.ofertas.map(o => `<tr><td>${esc(o.r.a)}</td><td>${esc(rate(o.r))}</td><td>${esc(gross(o.r))}</td><td class="num${o.max < 1000 ? ' neg' : ''}"><b>${money(o.max)}</b></td></tr>`).join('')}</tbody></table>` : '<p class="hint">Sem oferta deste emissor no primário hoje.</p>'}</div></div></td></tr>`;
       }
     });
-    h += `</tbody></table><p class="hint fgc-nota">Posição hoje e valores projetados são brutos, como o FGC considera. "Nova aplic." é o maior valor que dá para aplicar hoje, a 100% do CDI, sem que o total do conglomerado passe de R$ 250 mil em nenhum momento até o prazo, já contando o rendimento das aplicações atuais e os vencimentos no caminho. Na oferta, o cálculo usa a taxa da própria oferta. Conglomerados são agrupados pelo nome do emissor (ex.: Omni Banco e Omni Financeira); confira grupos com nomes diferentes. Há também o teto global de R$ 1 milhão a cada 4 anos por CPF. Projeções em dias corridos e taxas indicativas.</p></section>`;
+    h += `</tbody></table>` + fgcMelhores(G) + `<p class="hint fgc-nota">Posição hoje e valores projetados são brutos, como o FGC considera. "Nova aplic." é o maior valor que dá para aplicar hoje, a 100% do CDI, sem que o total do conglomerado passe de R$ 250 mil em nenhum momento até o prazo, já contando o rendimento das aplicações atuais e os vencimentos no caminho. Na oferta, o cálculo usa a taxa da própria oferta. Conglomerados são agrupados pelo nome do emissor (ex.: Omni Banco e Omni Financeira); confira grupos com nomes diferentes. Há também o teto global de R$ 1 milhão a cada 4 anos por CPF. Projeções em dias corridos e taxas indicativas.</p></section>`;
     return h;
+  }
+  // Card: melhores taxas de hoje onde a cliente ainda tem espaço (um emissor por linha, 6 meses a 5 anos)
+  function fgcMelhores(G) {
+    const porKey = Object.fromEntries(G.map(g => [g.key, g]));
+    const ofs = R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a) && r.b <= 5).map(r => {
+      const key = fgcKey(emBase(r)), g = porKey[key], T = anos(new Date(+r.vd.slice(0, 4), +r.vd.slice(4, 6) - 1, +r.vd.slice(6, 8)));
+      return { r, key, tem: !!g, max: maxNova(g ? g.ps : [], r.i, rnum(r), T) };
+    }).filter(o => o.max >= Math.max(1000, o.r.am || 0));
+    const blocos = ['PRE', 'CDI', 'IPCA', 'CDI+'].map(ix => {
+      const top = [], seen = new Set();
+      ofs.filter(o => o.r.i === ix).sort((a, b) => gnum(b.r) - gnum(a.r) || b.max - a.max).forEach(o => { if (top.length < 6 && !seen.has(o.key)) { seen.add(o.key); top.push(o); } });
+      return top.length ? `<div><h4>${IXN[ix]}</h4><table class="tbl mini"><thead><tr><th>Ativo</th><th>Rating</th><th class="num">Taxa</th><th class="num">Gross Up</th><th class="num">Espaço coberto</th></tr></thead><tbody>
+        ${top.map(o => `<tr><td>${esc(o.r.a)}${o.r.x ? ' <span class="tag">Isento IR</span>' : ''}${o.tem ? ' <small>· já possui</small>' : ''}</td><td>${esc(o.r.rt)}</td><td class="num">${esc(rate(o.r))}</td><td class="num"><b>${esc(gross(o.r))}</b></td><td class="num">${money(o.max)}</td></tr>`).join('')}</tbody></table></div>` : '';
+    }).join('');
+    return `<div class="fgc-best"><div class="block-h"><h2>Melhores taxas de hoje onde ela tem espaço</h2><span>Bancários com FGC, 6 meses a 5 anos · um emissor por linha, ordenado pelo Gross Up · ${label()}</span></div><div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
   }
   async function fgcLoad(file) {
     try {
@@ -962,6 +979,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   function fgcBind() {
     const f = $('#fgc-file'); if (!f) return;
     f.addEventListener('change', e => e.target.files[0] && fgcLoad(e.target.files[0]));
+    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set() }); render(); });
     ['cdi', 'ipca'].forEach(k => $('#fgc-' + k).addEventListener('change', e => { fgc[k] = parseFloat(e.target.value) || 0; render(); }));
     $('#main').querySelectorAll('[data-fk]').forEach(tr => tr.addEventListener('click', () => { const k = tr.dataset.fk; fgc.open.has(k) ? fgc.open.delete(k) : fgc.open.add(k); render(); }));
   }
