@@ -90,6 +90,7 @@ td.xcell { position: relative; }
 .fgc-t small { color: var(--gray); font-weight: 400; } .fgc-det > td { background: #faf8f3; padding: 12px 16px !important; }
 .fgc-cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; } .fgc-cols h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); }
 .tbl.mini { font-size: 12.5px; margin-bottom: 10px; } .fgc-nota { padding: 10px 16px 16px; line-height: 1.45; }
+.fgc-pz { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 12px 16px 0; } .fgc-pz span { font-weight: 600; margin-right: 4px; } .fgc-pz small { color: var(--gray); margin-left: 6px; }
 .fgc-best { margin: 18px 16px 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; } .fgc-best-g { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; padding: 12px 16px 4px; } .fgc-best h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; color: var(--navy); } .tag { border: 1px solid #2e7d4f; color: #2e7d4f; border-radius: 999px; padding: 0 6px; font-size: 11px; }
 @media (max-width: 1000px) { .fgc-best-g { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .fgc-cols { grid-template-columns: 1fr; } }
@@ -858,7 +859,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
 
   // ---------- Análise FGC (bancários) ----------
   const FGC_LIM = 250000, FGC_TIPOS = /^(CDB|LCA|LCI|LC|RDB|LH)\b/;
-  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '' };
+  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '', pz: new Set() };
   const STOP = new Set(['BANCO','BANK','S.A.','S.A','SA','S/A','S/','LTDA','FINANCEIRA','FINANCIAMENTOS','FINANCIADOR','CONSIGNADO','SCFI','CFI','SCD','SOCIEDADE','DE','DO','DA','CREDITO','CRÉDITO','(BRASIL)','BRASIL','-','GRUPO','INVESTIMENTO','MULTIPLO','MÚLTIPLO','CAPITAL']);
   const ALIAS = { 'CAIXA': 'CAIXA', 'CEF': 'CAIXA' };
   const fgcKey = nome => { const s = semAcento(nome.replace(/ - [A-Z]{3}\/\d{4}.*$/, '').replace(FGC_TIPOS, '')).replace(/[.,]/g, m => m === '.' ? '.' : ' ');
@@ -954,17 +955,18 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   // Card: melhores taxas de hoje onde a cliente ainda tem espaço (um emissor por linha, 6 meses a 5 anos)
   function fgcMelhores(G) {
     const porKey = Object.fromEntries(G.map(g => [g.key, g]));
-    const ofs = R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a) && r.b <= 5).map(r => {
+    const ofs = R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a) && r.b <= 5 && (!fgc.pz.size || fgc.pz.has(r.b))).map(r => {
       const key = fgcKey(emBase(r)), g = porKey[key], T = anos(new Date(+r.vd.slice(0, 4), +r.vd.slice(4, 6) - 1, +r.vd.slice(6, 8)));
       return { r, key, tem: !!g, max: maxNova(g ? g.ps : [], r.i, rnum(r), T) };
     }).filter(o => o.max >= Math.max(1000, o.r.am || 0));
     const blocos = ['PRE', 'CDI', 'IPCA', 'CDI+'].map(ix => {
       const top = [], seen = new Set();
-      ofs.filter(o => o.r.i === ix).sort((a, b) => gnum(b.r) - gnum(a.r) || b.max - a.max).forEach(o => { if (top.length < 6 && !seen.has(o.key)) { seen.add(o.key); top.push(o); } });
+      ofs.filter(o => o.r.i === ix).sort((a, b) => gnum(b.r) - gnum(a.r) || b.max - a.max).forEach(o => { if (top.length < 7 && !seen.has(o.key)) { seen.add(o.key); top.push(o); } });
       return top.length ? `<div><h4>${IXN[ix]}</h4><table class="tbl mini"><thead><tr><th>Ativo</th><th>Rating</th><th class="num">Taxa</th><th class="num">Gross Up</th><th class="num">Espaço coberto</th></tr></thead><tbody>
         ${top.map(o => `<tr><td>${esc(o.r.a)}${o.r.x ? ' <span class="tag">Isento IR</span>' : ''}${o.tem ? ' <small>· já possui</small>' : ''}</td><td>${esc(o.r.rt)}</td><td class="num">${esc(rate(o.r))}</td><td class="num"><b>${esc(gross(o.r))}</b></td><td class="num">${money(o.max)}</td></tr>`).join('')}</tbody></table></div>` : '';
     }).join('');
-    return `<div class="fgc-best"><div class="block-h"><h2>Melhores taxas de hoje onde ela tem espaço</h2><span>Bancários com FGC, 6 meses a 5 anos · um emissor por linha, ordenado pelo Gross Up · ${label()}</span></div><div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
+    return `<div class="fgc-best"><div class="block-h"><h2>Melhores taxas de hoje onde ela tem espaço</h2><span>Bancários com FGC · top 7 emissores por indexador, ordenado pelo Gross Up · ${label()}</span></div>
+      <div class="fgc-pz"><span>Prazo:</span>${BK.slice(0, 6).map((t, i) => `<button type="button" class="chip" data-fpz="${i}" aria-pressed="${fgc.pz.has(i)}">${t}</button>`).join('')}${fgc.pz.size ? '<button type="button" class="chip" data-fpz="x">Todos</button>' : '<small>todos de 6 meses a 5 anos</small>'}</div><div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
   }
   async function fgcLoad(file) {
     try {
@@ -979,7 +981,8 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   function fgcBind() {
     const f = $('#fgc-file'); if (!f) return;
     f.addEventListener('change', e => e.target.files[0] && fgcLoad(e.target.files[0]));
-    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set() }); render(); });
+    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set(), pz: new Set() }); render(); });
+    $('#main').querySelectorAll('[data-fpz]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.fpz; if (v === 'x') fgc.pz.clear(); else { const i = +v; fgc.pz.has(i) ? fgc.pz.delete(i) : fgc.pz.add(i); } render(); }));
     ['cdi', 'ipca'].forEach(k => $('#fgc-' + k).addEventListener('change', e => { fgc[k] = parseFloat(e.target.value) || 0; render(); }));
     $('#main').querySelectorAll('[data-fk]').forEach(tr => tr.addEventListener('click', () => { const k = tr.dataset.fk; fgc.open.has(k) ? fgc.open.delete(k) : fgc.open.add(k); render(); }));
   }
