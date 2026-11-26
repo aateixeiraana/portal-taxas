@@ -80,6 +80,17 @@ td.xcell { position: relative; }
 .tabs a[aria-current="page"] { color: var(--title); border-bottom-color: var(--accent); }
 .tabs a .n { font-weight: 400; color: var(--gray); font-size: 12px; margin-left: 4px; }
 
+.vfgc .wrap { grid-template-columns: minmax(0, 1fr); } .vfgc .filters { display: none; }
+.fgc-in { padding: 14px 16px 4px; display: flex; flex-direction: column; gap: 10px; }
+.fgc-up { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; } .fgc-up label.pdfbtn { cursor: pointer; }
+.fgc-par input { width: 70px; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; font: inherit; }
+.fgc-kpi { display: flex; gap: 12px; padding: 8px 16px 14px; flex-wrap: wrap; } .fgc-kpi div { background: var(--beige); border-radius: 6px; padding: 10px 16px; min-width: 200px; }
+.fgc-kpi span { display: block; font-size: 12px; color: var(--gray); } .fgc-kpi b { font-size: 22px; } .neg { color: #b4372f !important; }
+.fgc-t tr.fgc-row { cursor: pointer; } .fgc-t tr.fgc-row:hover td { background: #efe9dc; } .fgc-t tr.ex td:first-child { box-shadow: inset 3px 0 0 #b4372f; }
+.fgc-t small { color: var(--gray); font-weight: 400; } .fgc-det > td { background: #faf8f3; padding: 12px 16px !important; }
+.fgc-cols { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; } .fgc-cols h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--navy); }
+.tbl.mini { font-size: 12.5px; margin-bottom: 10px; } .fgc-nota { padding: 10px 16px 16px; line-height: 1.45; }
+@media (max-width: 1000px) { .fgc-cols { grid-template-columns: 1fr; } }
 .wrap { max-width: 1440px; margin: 0 auto; padding: 18px 20px 40px; display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
 
@@ -188,6 +199,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     <a href="#credito" data-v="credito">Crédito Privado e LF <span class="n" id="n-credito"></span></a>
     <a href="#titulos" data-v="titulos">Títulos Públicos <span class="n" id="n-titulos"></span></a>
     <a href="#resumo" data-v="resumo">Resumo por emissor</a>
+    <a href="#fgc" data-v="fgc">Análise FGC</a>
   </nav>
 </header>
 
@@ -842,6 +854,117 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   $('#pdfall').addEventListener('click', () => abrirEscolha(FULL));
   $('#pdfdest').addEventListener('click', () => abrirEscolha(DEST));
 
+  // ---------- Análise FGC (bancários) ----------
+  const FGC_LIM = 250000, FGC_TIPOS = /^(CDB|LCA|LCI|LC|RDB|LH)\b/;
+  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '' };
+  const STOP = new Set(['BANCO','BANK','S.A.','S.A','SA','S/A','S/','LTDA','FINANCEIRA','FINANCIAMENTOS','FINANCIADOR','CONSIGNADO','SCFI','CFI','SCD','SOCIEDADE','DE','DO','DA','CREDITO','CRÉDITO','(BRASIL)','BRASIL','-','GRUPO','INVESTIMENTO','MULTIPLO','MÚLTIPLO','CAPITAL']);
+  const ALIAS = { 'CAIXA': 'CAIXA', 'CEF': 'CAIXA' };
+  const fgcKey = nome => { const s = semAcento(nome.replace(/ - [A-Z]{3}\/\d{4}.*$/, '').replace(FGC_TIPOS, '')).replace(/[.,]/g, m => m === '.' ? '.' : ' ');
+    const w = s.split(/\s+/).filter(x => x && !STOP.has(x)); const k = w[0] || s.trim(); return ALIAS[k] || k; };
+  const fgcNome = nome => nome.replace(/ - [A-Z]{3}\/\d{4}.*$/, '').replace(FGC_TIPOS, '').trim();
+  const brNum = v => typeof v === 'number' ? v : parseFloat(String(v).replace(/[R$\s%+]/g, '').replace(/\./g, '').replace(',', '.')) || 0;
+  const brData = s => { const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4})/); return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null; };
+  const HOJE = (() => { const [d, m, y] = D.date.split('/'); return new Date(+y, +m - 1, +d); })();
+  const anos = dt => (dt - HOJE) / 864e5 / 365;
+  const mmaa = dt => ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][dt.getMonth()] + '/' + String(dt.getFullYear()).slice(2);
+  // fator de crescimento em t anos para uma taxa (texto da carteira ou índice + número das ofertas)
+  function fator(ix, n, t) {
+    if (t <= 0) return 1;
+    const cdi = fgc.cdi / 100, ipca = fgc.ipca / 100;
+    if (ix === 'PRE') return Math.pow(1 + n / 100, t);
+    if (ix === 'CDI') return Math.pow(1 + (Math.pow(1 + cdi, 1 / 252) - 1) * n / 100, 252 * t);
+    if (ix === 'CDI+') return Math.pow((1 + cdi) * (1 + n / 100), t);
+    if (ix === 'IPCA') return Math.pow((1 + ipca) * (1 + n / 100), t);
+    return Math.pow(1 + cdi, t);
+  }
+  function taxaCarteira(txt) {
+    const u = semAcento(txt), n = brNum((u.match(/-?[\d.,]+/) || ['0'])[0]);
+    if (/IPC/.test(u)) return ['IPCA', n]; if (/CDI\s*[+-]/.test(u)) return ['CDI+', /CDI\s*-/.test(u) ? -n : n];
+    if (/CDI/.test(u)) return ['CDI', n]; return ['PRE', n];
+  }
+  function lerCarteira(rows) {
+    const out = []; let map = null; let conta = '';
+    rows.forEach(r => {
+      const cells = r.map(c => c == null ? '' : String(c).trim());
+      const j = cells.join(' '); const mc = j.match(/Conta:\s*(\d+)/); if (mc) conta = mc[1];
+      const iA = cells.indexOf('Aplicação'), iP = cells.indexOf('Posição');
+      if (iA >= 0 && iP >= 0) { map = { a: iA, v: cells.indexOf('Vencimento'), t: cells.indexOf('Taxa'), ap: cells.indexOf('Valor aplicado'), p: iP }; map.n = cells.findIndex((c, k) => k < iA && c); if (map.n < 0) map.n = 0; return; }
+      if (!map) return;
+      const nome = cells.slice(0, map.a).find(c => c) || '';
+      if (!nome) return;
+      if (/\|/.test(nome) || !brData(cells[map.v])) { if (/\|/.test(nome)) map = null; return; }
+      if (!FGC_TIPOS.test(nome)) return;
+      const [ix, n] = taxaCarteira(cells[map.t]);
+      out.push({ nome, tipo: nome.split(' ')[0], emissor: fgcNome(nome), key: fgcKey(nome), apl: brData(cells[map.a]), venc: brData(cells[map.v]), taxa: cells[map.t], ix, n, aplicado: brNum(cells[map.ap]), pos: brNum(cells[map.p]) });
+    });
+    return { pos: out, conta };
+  }
+  // exposição bruta projetada do conglomerado na data t (anos); incluiVenc: conta quem vence exatamente em t
+  const expo = (ps, t) => ps.reduce((s, p) => s + (anos(p.venc) >= t - 1e-9 ? p.pos * fator(p.ix, p.n, Math.min(t, anos(p.venc))) : 0), 0);
+  // maior aplicação nova (indexada por ix/n, vencendo em T anos) que fica 100% coberta até o vencimento
+  function maxNova(ps, ix, n, T) {
+    const pts = [0, T, ...ps.map(p => anos(p.venc)).filter(t => t > 0 && t <= T)];
+    return Math.max(0, Math.min(...pts.map(t => (FGC_LIM - expo(ps, t)) / fator(ix, n, t))));
+  }
+  function grupos() {
+    const g = {};
+    fgc.pos.forEach(p => { (g[p.key] = g[p.key] || { key: p.key, nomes: new Set(), ps: [] }).ps.push(p); g[p.key].nomes.add(p.emissor); });
+    return Object.values(g).map(x => {
+      const hoje = x.ps.reduce((s, p) => s + p.pos, 0);
+      const datas = [...new Set(x.ps.map(p => +p.venc))].sort((a, b) => a - b).map(d => new Date(d));
+      let pico = { v: hoje, d: HOJE }; datas.forEach(d => { const v = expo(x.ps, anos(d)); if (v > pico.v) pico = { v, d }; });
+      const libera = datas.map(d => ({ d, v: x.ps.filter(p => +p.venc === +d).reduce((s, p) => s + p.pos * fator(p.ix, p.n, anos(p.venc)), 0) }));
+      const horiz = [1, 2, 3, 5].map(T => maxNova(x.ps, 'CDI', 100, T));
+      const ofertas = R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a) && fgcKey(emBase(r)) === x.key)
+        .map(r => ({ r, T: anos(new Date(+r.vd.slice(0, 4), +r.vd.slice(4, 6) - 1, +r.vd.slice(6, 8))) }))
+        .map(o => ({ ...o, max: maxNova(x.ps, o.r.i, rnum(o.r), o.T) })).sort((a, b) => a.T - b.T || gnum(b.r) - gnum(a.r));
+      return { ...x, hoje, livreHoje: Math.max(0, FGC_LIM - hoje), pico, libera, horiz, ofertas, excede: pico.v > FGC_LIM };
+    }).sort((a, b) => b.hoje - a.hoje);
+  }
+  function fgcView() {
+    let h = `<section class="block fgc"><div class="block-h"><h2>Análise de carteira · espaço no FGC (bancários)</h2><span>Limite de R$ 250 mil por CPF e por conglomerado</span></div><div class="fgc-in">
+      <div class="fgc-up"><label class="pdfbtn" for="fgc-file">Carregar Posição Consolidada (Excel)</label><input type="file" id="fgc-file" accept=".xlsx,.xls" hidden>
+      <span>${fgc.file ? `<b>${esc(fgc.file)}</b>${fgc.conta ? ' · conta ' + esc(fgc.conta) : ''} · ${fgc.pos.length} aplicações bancárias com FGC` : 'Exporte a Posição Consolidada do cliente no Hub e carregue aqui. O arquivo é lido só no seu navegador, nada é enviado.'}</span></div>
+      <div class="fgc-par">Projeção: CDI <input id="fgc-cdi" type="number" step="0.05" value="${fgc.cdi}">% a.a. · IPCA <input id="fgc-ipca" type="number" step="0.05" value="${fgc.ipca}">% a.a. · nova aplicação de referência: 100% do CDI</div>
+      ${fgc.erro ? `<p class="aviso-tp">${esc(fgc.erro)}</p>` : ''}</div>`;
+    if (!fgc.pos.length) return h + `<p class="hint" style="padding:0 16px 16px">Entram na conta CDB, LCA, LCI, LC, RDB e LH. LF, LCD, CRI, CRA, debêntures, títulos públicos e COE não têm FGC e ficam fora.</p></section>`;
+    const G = grupos();
+    const tot = G.reduce((s, g) => s + g.hoje, 0), nEx = G.filter(g => g.excede).length;
+    h += `<div class="fgc-kpi"><div><span>Bancários com FGC hoje</span><b>${money(tot)}</b></div><div><span>Conglomerados</span><b>${G.length}</b></div><div><span>Passam de R$ 250 mil até o vencimento</span><b class="${nEx ? 'neg' : ''}">${nEx}</b></div></div>
+    <table class="tbl fgc-t"><thead><tr><th>Conglomerado</th><th class="num">Posição hoje</th><th class="num">Espaço hoje</th><th class="num">Pico projetado</th><th class="num">Nova aplic. até 1 ano</th><th class="num">2 anos</th><th class="num">3 anos</th><th class="num">5 anos</th><th>Próxima liberação</th></tr></thead><tbody>`;
+    G.forEach(g => {
+      const ab = fgc.open.has(g.key), prox = g.libera.find(l => l.d > HOJE);
+      h += `<tr class="fgc-row${g.excede ? ' ex' : ''}" data-fk="${esc(g.key)}"><td><b>${ab ? '▾' : '▸'} ${esc([...g.nomes].join(' / '))}</b> <small>${g.ps.length} aplic.</small></td><td class="num">${money(g.hoje)}</td><td class="num"><b>${money(g.livreHoje)}</b></td>
+        <td class="num${g.excede ? ' neg' : ''}">${money(g.pico.v)}${g.pico.d > HOJE ? ` <small>${mmaa(g.pico.d)}</small>` : ''}</td>${g.horiz.map(v => `<td class="num">${money(v)}</td>`).join('')}
+        <td>${prox ? `${money(prox.v)} em ${mmaa(prox.d)}` : '-'}</td></tr>`;
+      if (ab) {
+        h += `<tr class="fgc-det"><td colspan="9"><div class="fgc-cols"><div><h4>Aplicações</h4><table class="tbl mini"><thead><tr><th>Ativo</th><th>Taxa</th><th class="num">Aplicado</th><th class="num">Posição hoje</th><th>Vencimento</th><th class="num">Valor no vencimento</th></tr></thead><tbody>
+          ${g.ps.slice().sort((a, b) => a.venc - b.venc).map(p => `<tr><td>${esc(p.nome)}</td><td>${esc(p.taxa)}</td><td class="num">${money(p.aplicado)}</td><td class="num">${money(p.pos)}</td><td>${p.venc.toLocaleDateString('pt-BR')}</td><td class="num">${money(p.pos * fator(p.ix, p.n, anos(p.venc)))}</td></tr>`).join('')}
+          </tbody></table><h4>Espaço liberado no tempo</h4><table class="tbl mini"><thead><tr><th>Data</th><th class="num">Vence</th><th class="num">Espaço logo após</th></tr></thead><tbody>
+          ${g.libera.map(l => `<tr><td>${l.d.toLocaleDateString('pt-BR')}</td><td class="num">${money(l.v)}</td><td class="num">${money(Math.max(0, FGC_LIM - expo(g.ps, anos(l.d) + 1e-6)))}</td></tr>`).join('')}</tbody></table></div>
+          <div><h4>Ofertas de hoje deste emissor (${label()})</h4>${g.ofertas.length ? `<table class="tbl mini"><thead><tr><th>Ativo</th><th>Taxa</th><th>Gross Up</th><th class="num">Aplicação máxima coberta</th></tr></thead><tbody>
+          ${g.ofertas.map(o => `<tr><td>${esc(o.r.a)}</td><td>${esc(rate(o.r))}</td><td>${esc(gross(o.r))}</td><td class="num${o.max < 1000 ? ' neg' : ''}"><b>${money(o.max)}</b></td></tr>`).join('')}</tbody></table>` : '<p class="hint">Sem oferta deste emissor no primário hoje.</p>'}</div></div></td></tr>`;
+      }
+    });
+    h += `</tbody></table><p class="hint fgc-nota">Posição hoje e valores projetados são brutos, como o FGC considera. "Nova aplic." é o maior valor que dá para aplicar hoje, a 100% do CDI, sem que o total do conglomerado passe de R$ 250 mil em nenhum momento até o prazo, já contando o rendimento das aplicações atuais e os vencimentos no caminho. Na oferta, o cálculo usa a taxa da própria oferta. Conglomerados são agrupados pelo nome do emissor (ex.: Omni Banco e Omni Financeira); confira grupos com nomes diferentes. Há também o teto global de R$ 1 milhão a cada 4 anos por CPF. Projeções em dias corridos e taxas indicativas.</p></section>`;
+    return h;
+  }
+  async function fgcLoad(file) {
+    try {
+      if (!window.XLSX) await new Promise((ok, ko) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = () => ko(new Error('não consegui carregar o leitor de Excel')); document.head.appendChild(s); });
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      let rows = []; wb.SheetNames.forEach(n => rows = rows.concat(XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: '' })));
+      const { pos, conta } = lerCarteira(rows);
+      Object.assign(fgc, { file: file.name, conta, pos, erro: pos.length ? '' : 'Não encontrei CDB, LCA, LCI, LC, RDB ou LH neste arquivo. Confira se é a Posição Consolidada do Hub.', open: new Set() });
+    } catch (e) { fgc.erro = 'Erro ao ler o arquivo: ' + e.message; }
+    render();
+  }
+  function fgcBind() {
+    const f = $('#fgc-file'); if (!f) return;
+    f.addEventListener('change', e => e.target.files[0] && fgcLoad(e.target.files[0]));
+    ['cdi', 'ipca'].forEach(k => $('#fgc-' + k).addEventListener('change', e => { fgc[k] = parseFloat(e.target.value) || 0; render(); }));
+    $('#main').querySelectorAll('[data-fk]').forEach(tr => tr.addEventListener('click', () => { const k = tr.dataset.fk; fgc.open.has(k) ? fgc.open.delete(k) : fgc.open.add(k); render(); }));
+  }
   function render() {
     const rows = R.filter(pass);
     const nEB = rows.filter(r => r.c === 'EB').length, nCP = rows.filter(r => r.c === 'CP' || r.c === 'LF').length, nTP = rows.filter(r => r.c === 'TP').length;
@@ -854,8 +977,11 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     else if (st.view === 'emissao') html += table('emissao', rows.filter(r => r.c === 'EB'));
     else if (st.view === 'credito') html += table('credito', rows.filter(r => r.c === 'CP' || r.c === 'LF'));
     else if (st.view === 'titulos') html += table('titulos', rows.filter(r => r.c === 'TP'));
+    else if (st.view === 'fgc') html = fgcView();
     else html += resumo(rows);
+    document.body.classList.toggle('vfgc', st.view === 'fgc');
     $('#main').innerHTML = html;
+    if (st.view === 'fgc') fgcBind();
     $('#main').querySelectorAll('th.s').forEach(th => th.addEventListener('click', () => {
       const v = th.dataset.view, k = th.dataset.k, s = st.sort[v] || { k: 'vd', d: 1 };
       st.sort[v] = { k, d: s.k === k ? -s.d : (k === 'rate' || k === 'gross' ? -1 : 1) }; render();
@@ -867,7 +993,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   }
   function route() {
     const h = location.hash.replace('#', '');
-    st.view = ['destaques','emissao','credito','titulos','resumo'].includes(h) ? h : 'destaques';
+    st.view = ['destaques','emissao','credito','titulos','resumo','fgc'].includes(h) ? h : 'destaques';
     document.querySelectorAll('.tabs a').forEach(a => a.setAttribute('aria-current', a.dataset.v === st.view ? 'page' : 'false'));
     render();
   }
