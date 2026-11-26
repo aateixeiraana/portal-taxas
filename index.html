@@ -92,6 +92,7 @@ td.xcell { position: relative; }
 .tbl.mini { font-size: 12.5px; margin-bottom: 10px; } .fgc-nota { padding: 10px 16px 16px; line-height: 1.45; }
 .fgc-pz { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 12px 16px 0; } .fgc-pz span { font-weight: 600; margin-right: 4px; } .fgc-pz small { color: var(--gray); margin-left: 6px; }
 .venc-t td.vz { color: #b9b4a8; } .venc-t td.pct { color: #b08d3c; font-weight: 600; } .venc-t tfoot td { background: var(--navy); color: #fff; font-weight: 700; padding: 6px 8px; } .venc-t td, .venc-t th { white-space: nowrap; }
+.fgc-best td.fx { width: 26px; padding: 0 2px !important; text-align: center; }
 .fgc-best { margin: 18px 16px 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; } .fgc-best-g { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; padding: 12px 16px 4px; } .fgc-best h4 { margin: 4px 0 6px; font-size: 13px; text-transform: uppercase; color: var(--navy); } .tag { border: 1px solid #2e7d4f; color: #2e7d4f; border-radius: 999px; padding: 0 6px; font-size: 11px; }
 @media (max-width: 1000px) { .fgc-best-g { grid-template-columns: 1fr; } }
 @media (max-width: 1000px) { .fgc-cols { grid-template-columns: 1fr; } }
@@ -860,7 +861,7 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
 
   // ---------- Análise FGC (bancários) ----------
   const FGC_LIM = 250000, FGC_TIPOS = /^(CDB|LCA|LCI|LC|RDB|LH)\b/;
-  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '', pz: new Set(), ano: new Set(), vencs: [], patr: 0 };
+  const fgc = { file: '', conta: '', data: '', pos: [], cdi: 14.90, ipca: 4.50, open: new Set(), erro: '', pz: new Set(), ano: new Set(), vencs: [], patr: 0, excl: new Set() };
   const STOP = new Set(['BANCO','BANK','S.A.','S.A','SA','S/A','S/','LTDA','FINANCEIRA','FINANCIAMENTOS','FINANCIADOR','CONSIGNADO','SCFI','CFI','SCD','SOCIEDADE','DE','DO','DA','CREDITO','CRÉDITO','(BRASIL)','BRASIL','-','GRUPO','INVESTIMENTO','MULTIPLO','MÚLTIPLO','CAPITAL']);
   const ALIAS = { 'CAIXA': 'CAIXA', 'CEF': 'CAIXA' };
   const fgcKey = nome => { const s = semAcento(nome.replace(/ - [A-Z]{3}\/\d{4}.*$/, '').replace(FGC_TIPOS, '')).replace(/[.,]/g, m => m === '.' ? '.' : ' ');
@@ -977,16 +978,16 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
     const ofs = R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a) && (fgc.ano.size ? fgc.ano.has(r.vd.slice(0, 4)) : r.b <= 5) && (!fgc.pz.size || fgc.pz.has(r.b))).map(r => {
       const key = fgcKey(emBase(r)), g = porKey[key], T = anos(new Date(+r.vd.slice(0, 4), +r.vd.slice(4, 6) - 1, +r.vd.slice(6, 8)));
       return { r, key, tem: !!g, max: maxNova(g ? g.ps : [], r.i, rnum(r), T) };
-    }).filter(o => o.max >= Math.max(1000, o.r.am || 0));
+    }).filter(o => !fgc.excl.has(o.key)).filter(o => o.max >= Math.max(1000, o.r.am || 0));
     const blocos = ['PRE', 'CDI', 'IPCA', 'CDI+'].map(ix => {
       const top = [], seen = new Set();
       ofs.filter(o => o.r.i === ix).sort((a, b) => gnum(b.r) - gnum(a.r) || b.max - a.max).forEach(o => { if (top.length < 7 && !seen.has(o.key)) { seen.add(o.key); top.push(o); } });
-      return top.length ? `<div><h4>${IXN[ix]}</h4><table class="tbl mini"><thead><tr><th>Ativo</th><th>Rating</th><th class="num">Taxa</th><th class="num">Gross Up</th><th class="num">Espaço coberto</th></tr></thead><tbody>
-        ${top.map(o => `<tr><td>${esc(o.r.a)}${o.r.x ? ' <span class="tag">Isento IR</span>' : ''}${o.tem ? ' <small>· já possui</small>' : ''}</td><td>${esc(o.r.rt)}</td><td class="num">${esc(rate(o.r))}</td><td class="num"><b>${esc(gross(o.r))}</b></td><td class="num">${money(o.max)}</td></tr>`).join('')}</tbody></table></div>` : '';
+      return top.length ? `<div><h4>${IXN[ix]}</h4><table class="tbl mini"><thead><tr><th>Ativo</th><th>Rating</th><th class="num">Taxa</th><th class="num">Gross Up</th><th class="num">Espaço coberto</th><th></th></tr></thead><tbody>
+        ${top.map(o => `<tr><td>${esc(o.r.a)}${o.r.x ? ' <span class="tag">Isento IR</span>' : ''}${o.tem ? ' <small>· já possui</small>' : ''}</td><td>${esc(o.r.rt)}</td><td class="num">${esc(rate(o.r))}</td><td class="num"><b>${esc(gross(o.r))}</b></td><td class="num">${money(o.max)}</td><td class="fx"><button type="button" class="xmini" data-fx="${esc(o.key)}" title="Tirar ${esc(emBase(o.r))} do card">×</button></td></tr>`).join('')}</tbody></table></div>` : '';
     }).join('');
     return `<div class="fgc-best"><div class="block-h"><h2>Melhores taxas de hoje onde ela tem espaço</h2><span>Bancários com FGC · top 7 emissores por indexador, ordenado pelo Gross Up · ${label()}</span></div>
       <div class="fgc-pz"><span>Prazo:</span>${BK.slice(0, 6).map((t, i) => `<button type="button" class="chip" data-fpz="${i}" aria-pressed="${fgc.pz.has(i)}">${t}</button>`).join('')}${fgc.pz.size ? '<button type="button" class="chip" data-fpz="x">Todos</button>' : '<small>todos de 6 meses a 5 anos</small>'}</div>
-      <div class="fgc-pz"><span>Ano de vencimento:</span>${[...new Set(R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a)).map(r => r.vd.slice(0, 4)))].sort().map(y => `<button type="button" class="chip" data-fano="${y}" aria-pressed="${fgc.ano.has(y)}">${y}</button>`).join('')}${fgc.ano.size ? '<button type="button" class="chip" data-fano="x">Todos</button>' : ''}</div><div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
+      <div class="fgc-pz"><span>Ano de vencimento:</span>${[...new Set(R.filter(r => r.c === 'EB' && FGC_TIPOS.test(r.a)).map(r => r.vd.slice(0, 4)))].sort().map(y => `<button type="button" class="chip" data-fano="${y}" aria-pressed="${fgc.ano.has(y)}">${y}</button>`).join('')}${fgc.ano.size ? '<button type="button" class="chip" data-fano="x">Todos</button>' : ''}</div>${fgc.excl.size ? `<div class="fgc-pz"><span>Fora do card:</span>${[...fgc.excl].map(k => `<button type="button" class="chip" aria-pressed="true" data-fxr="${esc(k)}" title="Voltar ${esc(k)} para o card">${esc(k)} ↺</button>`).join('')}<button type="button" class="chip" data-fxr="*">Restaurar todos</button></div>` : ''}<div class="fgc-best-g">${blocos || '<p class="hint">Nenhuma oferta com espaço suficiente hoje.</p>'}</div></div>`;
   }
   // Card de vencimentos: ano x mês, % sobre o patrimônio total da carteira
   function fgcVenc() {
@@ -1019,7 +1020,9 @@ table.rc tr:hover .xmini, .xmini:focus-visible { opacity: 1; }
   function fgcBind() {
     const f = $('#fgc-file'); if (!f) return;
     f.addEventListener('change', e => e.target.files[0] && fgcLoad(e.target.files[0]));
-    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set(), pz: new Set(), ano: new Set(), vencs: [], patr: 0 }); render(); });
+    const c = $('#fgc-clear'); if (c) c.addEventListener('click', () => { Object.assign(fgc, { file: '', conta: '', pos: [], erro: '', open: new Set(), pz: new Set(), ano: new Set(), vencs: [], patr: 0, excl: new Set() }); render(); });
+    $('#main').querySelectorAll('[data-fx]').forEach(b => b.addEventListener('click', () => { fgc.excl.add(b.dataset.fx); render(); }));
+    $('#main').querySelectorAll('[data-fxr]').forEach(b => b.addEventListener('click', () => { b.dataset.fxr === '*' ? fgc.excl.clear() : fgc.excl.delete(b.dataset.fxr); render(); }));
     $('#main').querySelectorAll('[data-fano]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.fano; if (v === 'x') fgc.ano.clear(); else fgc.ano.has(v) ? fgc.ano.delete(v) : fgc.ano.add(v); render(); }));
     $('#main').querySelectorAll('[data-fpz]').forEach(b => b.addEventListener('click', () => { const v = b.dataset.fpz; if (v === 'x') fgc.pz.clear(); else { const i = +v; fgc.pz.has(i) ? fgc.pz.delete(i) : fgc.pz.add(i); } render(); }));
     ['cdi', 'ipca'].forEach(k => $('#fgc-' + k).addEventListener('change', e => { fgc[k] = parseFloat(e.target.value) || 0; render(); }));
